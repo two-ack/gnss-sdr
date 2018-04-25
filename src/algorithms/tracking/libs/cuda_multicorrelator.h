@@ -35,7 +35,6 @@
 #ifndef GNSS_SDR_CUDA_MULTICORRELATOR_H_
 #define GNSS_SDR_CUDA_MULTICORRELATOR_H_
 
-
 #ifdef __CUDACC__
 #define CUDA_CALLABLE_MEMBER_GLOBAL __global__
 #define CUDA_CALLABLE_MEMBER_DEVICE __device__
@@ -47,6 +46,16 @@
 #include <complex>
 #include <cuda.h>
 #include <cuda_runtime.h>
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+    if (code != cudaSuccess)
+    {
+        fprintf(stderr,"CUDA Error: %s %s %d\n", cudaGetErrorString(code), file, line);
+        if (abort) exit(code);
+    }
+}
 
 // GPU new internal data types for complex numbers
 

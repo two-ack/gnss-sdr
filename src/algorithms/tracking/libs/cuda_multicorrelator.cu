@@ -90,7 +90,7 @@ __global__ void Doppler_wippe_scalarProdGPUCPXxN_shifts_chips(
         for (int iAccum = threadIdx.x; iAccum < ACCUM_N; iAccum += blockDim.x)
         {
         	GPU_Complex sum = GPU_Complex(0,0);
-            float local_code_chip_index=0.0;;
+            float local_code_chip_index=0.0;
             //float code_phase;
             for (int pos = iAccum; pos < elementN; pos += ACCUM_N)
             {
@@ -139,65 +139,65 @@ bool cuda_multicorrelator::init_cuda_integrated_resampler(
 		int signal_length_samples,
 		int code_length_chips,
 		int n_correlators
-		)
-{
+) {
 	// use command-line specified CUDA device, otherwise use device with highest Gflops/s
-//	findCudaDevice(argc, (const char **)argv);
-      cudaDeviceProp  prop;
-    int num_devices, device;
-    cudaGetDeviceCount(&num_devices);
-    if (num_devices > 1) {
-          int max_multiprocessors = 0, max_device = 0;
-          for (device = 0; device < num_devices; device++) {
-                  cudaDeviceProp properties;
-                  cudaGetDeviceProperties(&properties, device);
-                  if (max_multiprocessors < properties.multiProcessorCount) {
-                          max_multiprocessors = properties.multiProcessorCount;
-                          max_device = device;
-                  }
-                  printf("Found GPU device # %i\n",device);
-          }
-          //cudaSetDevice(max_device);
+	// findCudaDevice(argc, (const char **)argv);
+	cudaDeviceProp prop;
+	int num_devices, device;
+	gpuErrchk(cudaGetDeviceCount(&num_devices));
+	printf("+NUM OF DEVICES %i\n", num_devices);
+	if (num_devices > 1) {
+		int max_multiprocessors = 0, max_device = 0;
+		for (device = 0; device < num_devices; device++) {
+			cudaDeviceProp properties;
+			cudaGetDeviceProperties(&properties, device);
+			if (max_multiprocessors < properties.multiProcessorCount) {
+				max_multiprocessors = properties.multiProcessorCount;
+				max_device = device;
+			}
+			printf("Found GPU device # %i\n", device);
+		}
 
-          //set random device!
-	  selected_gps_device=rand() % num_devices;//generates a random number between 0 and num_devices to split the threads between GPUs
-          cudaSetDevice(selected_gps_device); 
+		//set random device!
+		selected_gps_device = rand() %
+							  num_devices;//generates a random number between 0 and num_devices to split the threads between GPUs
+		gpuErrchk(cudaSetDevice(selected_gps_device));
 
-          cudaGetDeviceProperties( &prop, max_device );
-          //debug code
-          if (prop.canMapHostMemory != 1) {
-              printf( "Device can not map memory.\n" );
-          }
-          printf("L2 Cache size= %u \n",prop.l2CacheSize);
-          printf("maxThreadsPerBlock= %u \n",prop.maxThreadsPerBlock);
-          printf("maxGridSize= %i \n",prop.maxGridSize[0]);
-          printf("sharedMemPerBlock= %lu \n",prop.sharedMemPerBlock);
-          printf("deviceOverlap= %i \n",prop.deviceOverlap);
-  	    printf("multiProcessorCount= %i \n",prop.multiProcessorCount);
-    }else{
-    	    cudaGetDevice( &selected_gps_device);
-    	    cudaGetDeviceProperties( &prop, selected_gps_device );
-    	    //debug code
-    	    if (prop.canMapHostMemory != 1) {
-    	        printf( "Device can not map memory.\n" );
-    	    }
+		gpuErrchk(cudaGetDeviceProperties(&prop, max_device));
+		//debug code
+		if (prop.canMapHostMemory != 1) {
+			printf("Device can not map memory.\n");
+		}
+		printf("L2 Cache size= %u \n", prop.l2CacheSize);
+		printf("maxThreadsPerBlock= %u \n", prop.maxThreadsPerBlock);
+		printf("maxGridSize= %i \n", prop.maxGridSize[0]);
+		printf("sharedMemPerBlock= %lu \n", prop.sharedMemPerBlock);
+		printf("deviceOverlap= %i \n", prop.deviceOverlap);
+		printf("multiProcessorCount= %i \n", prop.multiProcessorCount);
+	} else {
+		gpuErrchk(cudaGetDevice(&selected_gps_device));
+		gpuErrchk(cudaGetDeviceProperties(&prop, selected_gps_device));
+		//debug code
+		if (prop.canMapHostMemory != 1) {
+			printf("Device can not map memory.\n");
+		}
 
-    	    printf("L2 Cache size= %u \n",prop.l2CacheSize);
-    	    printf("maxThreadsPerBlock= %u \n",prop.maxThreadsPerBlock);
-    	    printf("maxGridSize= %i \n",prop.maxGridSize[0]);
-    	    printf("sharedMemPerBlock= %lu \n",prop.sharedMemPerBlock);
-    	    printf("deviceOverlap= %i \n",prop.deviceOverlap);
-    	    printf("multiProcessorCount= %i \n",prop.multiProcessorCount);
-    }
+		printf("L2 Cache size= %u \n", prop.l2CacheSize);
+		printf("maxThreadsPerBlock= %u \n", prop.maxThreadsPerBlock);
+		printf("maxGridSize= %i \n", prop.maxGridSize[0]);
+		printf("sharedMemPerBlock= %lu \n", prop.sharedMemPerBlock);
+		printf("deviceOverlap= %i \n", prop.deviceOverlap);
+		printf("multiProcessorCount= %i \n", prop.multiProcessorCount);
+	}
 
 	// (cudaFuncSetCacheConfig(CUDA_32fc_x2_multiply_x2_dot_prod_32fc_, cudaFuncCachePreferShared));
 
-    // ALLOCATE GPU MEMORY FOR INPUT/OUTPUT and INTERNAL vectors
-    size_t size = signal_length_samples * sizeof(GPU_Complex);
+	// ALLOCATE GPU MEMORY FOR INPUT/OUTPUT and INTERNAL vectors
+	size_t size = signal_length_samples * sizeof(GPU_Complex);
 
 	//********* ZERO COPY VERSION ************
 	// Set flag to enable zero copy access
-    // Optimal in shared memory devices (like Jetson K1)
+	// Optimal in shared memory devices (like Jetson K1)
 	//cudaSetDeviceFlags(cudaDeviceMapHost);
 
 	//******** CudaMalloc version ***********
@@ -207,30 +207,30 @@ bool cuda_multicorrelator::init_cuda_integrated_resampler(
 	//	cudaMemset(d_sig_in,0,size);
 
 	// Doppler-free signal (internal GPU memory)
-	cudaMalloc((void **)&d_sig_doppler_wiped, size);
-	cudaMemset(d_sig_doppler_wiped,0,size);
+	gpuErrchk(cudaMalloc((void **) &d_sig_doppler_wiped, size));
+	gpuErrchk(cudaMemset(d_sig_doppler_wiped, 0, size));
 
 	// Local code GPU memory (can be mapped to CPU memory in shared memory devices!)
-	cudaMalloc((void **)&d_local_codes_in, sizeof(std::complex<float>)*code_length_chips);
-	cudaMemset(d_local_codes_in,0,sizeof(std::complex<float>)*code_length_chips);
+	gpuErrchk(cudaMalloc((void **) &d_local_codes_in, sizeof(std::complex < float > ) * code_length_chips));
+	gpuErrchk(cudaMemset(d_local_codes_in, 0, sizeof(std::complex < float > ) * code_length_chips));
 
-    d_code_length_chips=code_length_chips;
+	d_code_length_chips = code_length_chips;
 
 	// Vector with the chip shifts for each correlator tap
-    //GPU memory (can be mapped to CPU memory in shared memory devices!)
-	cudaMalloc((void **)&d_shifts_chips, sizeof(float)*n_correlators);
-	cudaMemset(d_shifts_chips,0,sizeof(float)*n_correlators);
+	//GPU memory (can be mapped to CPU memory in shared memory devices!)
+	gpuErrchk(cudaMalloc((void **) &d_shifts_chips, sizeof(float) * n_correlators));
+	gpuErrchk(cudaMemset(d_shifts_chips, 0, sizeof(float) * n_correlators));
 
 	//scalars
 	//cudaMalloc((void **)&d_corr_out, sizeof(std::complex<float>)*n_correlators);
 	//cudaMemset(d_corr_out,0,sizeof(std::complex<float>)*n_correlators);
 
-    // Launch the Vector Add CUDA Kernel
-    // TODO: write a smart load balance using device info!
-	threadsPerBlock = 64;
-    blocksPerGrid = 128;//(int)(signal_length_samples+threadsPerBlock-1)/threadsPerBlock;
+	// Launch the Vector Add CUDA Kernel
+	// TODO: write a smart load balance using device info!
+	threadsPerBlock = 1024;
+	blocksPerGrid = 64;//(signal_length_samples + threadsPerBlock - 1)/threadsPerBlock;
 
-	cudaStreamCreate (&stream1) ;
+	gpuErrchk(cudaStreamCreate(&stream1));
 	//cudaStreamCreate (&stream2) ;
 	return true;
 }
@@ -243,7 +243,7 @@ bool cuda_multicorrelator::set_local_code_and_taps(
 		)
 {
 
-          cudaSetDevice(selected_gps_device);
+	gpuErrchk(cudaSetDevice(selected_gps_device));
 	//********* ZERO COPY VERSION ************
 //	// Get device pointer from host memory. No allocation or memcpy
 //	cudaError_t code;
@@ -262,12 +262,13 @@ bool cuda_multicorrelator::set_local_code_and_taps(
 
 	//******** CudaMalloc version ***********
     //local code CPU -> GPU copy memory
-    cudaMemcpyAsync(d_local_codes_in, local_codes_in, sizeof(GPU_Complex)*code_length_chips, cudaMemcpyHostToDevice,stream1);
+    gpuErrchk(cudaMemcpyAsync(d_local_codes_in, local_codes_in,
+                      sizeof(GPU_Complex)*code_length_chips, cudaMemcpyHostToDevice, stream1));
     d_code_length_chips=code_length_chips;
 
     //Correlator shifts vector CPU -> GPU copy memory (fractional chip shifts are allowed!)
-    cudaMemcpyAsync(d_shifts_chips, shifts_chips, sizeof(float)*n_correlators,
-                                    cudaMemcpyHostToDevice,stream1);
+    gpuErrchk(cudaMemcpyAsync(d_shifts_chips, shifts_chips, sizeof(float)*n_correlators,
+                                    cudaMemcpyHostToDevice, stream1));
 
 	return true;
 }
@@ -278,32 +279,17 @@ bool cuda_multicorrelator::set_input_output_vectors(
 		)
 {
 
-         cudaSetDevice(selected_gps_device);
+	gpuErrchk(cudaSetDevice(selected_gps_device));
 	// Save CPU pointers
-	d_sig_in_cpu =sig_in;
+	d_sig_in_cpu = sig_in;
 	d_corr_out_cpu = corr_out;
 
 	// Zero Copy version
 	// Get device pointer from host memory. No allocation or memcpy
-	cudaError_t code;
-	code=cudaHostGetDevicePointer((void **)&d_sig_in,  (void *) sig_in, 0);
-	code=cudaHostGetDevicePointer((void **)&d_corr_out,  (void *) corr_out, 0);
-	if (code!=cudaSuccess)
-	{
-		printf("cuda cudaHostGetDevicePointer error \r\n");
-	}
+	gpuErrchk(cudaHostGetDevicePointer((void **)&d_sig_in,  (void *) sig_in, 0));
+	gpuErrchk(cudaHostGetDevicePointer((void **)&d_corr_out,  (void *) corr_out, 0));
 	return true;
 
-}
-
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-   if (code != cudaSuccess)
-   {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
 }
 
 bool cuda_multicorrelator::Carrier_wipeoff_multicorrelator_resampler_cuda(
@@ -315,7 +301,7 @@ bool cuda_multicorrelator::Carrier_wipeoff_multicorrelator_resampler_cuda(
 		int n_correlators)
 	{
 
-    cudaSetDevice(selected_gps_device); 
+    gpuErrchk(cudaSetDevice(selected_gps_device));
 	// cudaMemCpy version
 	//size_t memSize = signal_length_samples * sizeof(std::complex<float>);
 	// input signal CPU -> GPU copy memory
@@ -325,7 +311,7 @@ bool cuda_multicorrelator::Carrier_wipeoff_multicorrelator_resampler_cuda(
 
     //launch the multitap correlator with integrated local code resampler!
 
-    Doppler_wippe_scalarProdGPUCPXxN_shifts_chips<<<blocksPerGrid, threadsPerBlock,0 ,stream1>>>(
+    Doppler_wippe_scalarProdGPUCPXxN_shifts_chips<<<blocksPerGrid, threadsPerBlock, 0, stream1>>>(
 			d_corr_out,
 			d_sig_in,
 			d_sig_doppler_wiped,
@@ -340,7 +326,7 @@ bool cuda_multicorrelator::Carrier_wipeoff_multicorrelator_resampler_cuda(
 			phase_step_rad
 			);
 
-    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaGetLastError() );
     gpuErrchk( cudaStreamSynchronize(stream1));
 
 	// cudaMemCpy version
@@ -369,20 +355,18 @@ cuda_multicorrelator::cuda_multicorrelator()
 bool cuda_multicorrelator::free_cuda()
 {
 	// Free device global memory
-	if (d_sig_in!=NULL) cudaFree(d_sig_in);
-	if (d_nco_in!=NULL) cudaFree(d_nco_in);
-	if (d_sig_doppler_wiped!=NULL) cudaFree(d_sig_doppler_wiped);
-	if (d_local_codes_in!=NULL) cudaFree(d_local_codes_in);
-	if (d_corr_out!=NULL) cudaFree(d_corr_out);
-	if (d_shifts_samples!=NULL) cudaFree(d_shifts_samples);
-	if (d_shifts_chips!=NULL) cudaFree(d_shifts_chips);
+	if (d_nco_in!=NULL) gpuErrchk(cudaFree(d_nco_in));
+	if (d_sig_doppler_wiped!=NULL) gpuErrchk(cudaFree(d_sig_doppler_wiped));
+	if (d_local_codes_in!=NULL) gpuErrchk(cudaFree(d_local_codes_in));
+	if (d_shifts_samples!=NULL) gpuErrchk(cudaFree(d_shifts_samples));
+	if (d_shifts_chips!=NULL) gpuErrchk(cudaFree(d_shifts_chips));
     // Reset the device and exit
     // cudaDeviceReset causes the driver to clean up all state. While
     // not mandatory in normal operation, it is good practice.  It is also
     // needed to ensure correct operation when the application is being
     // profiled. Calling cudaDeviceReset causes all profile data to be
     // flushed before the application exits
-	cudaDeviceReset();
+    // cudaDeviceReset();
 	return true;
 }
 

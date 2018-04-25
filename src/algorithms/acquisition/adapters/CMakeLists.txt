@@ -16,6 +16,18 @@
 # along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
 #
 
+if(ENABLE_FPGA)
+    set(OPT_ACQ_ADAPTERS ${OPT_ACQ_ADAPTERS} gps_l1_ca_pcps_acquisition_fpga.cc)
+endif(ENABLE_FPGA)
+
+if(OPENCL_FOUND)
+    set(OPT_ACQ_ADAPTERS ${OPT_ACQ_ADAPTERS} gps_l1_ca_pcps_opencl_acquisition.cc)
+endif(OPENCL_FOUND)
+
+if(ENABLE_CUDA)
+    set(OPT_ACQ_ADAPTERS ${OPT_ACQ_ADAPTERS} gps_l1_ca_pcps_cuda_acquisition.cc)
+    set(OPT_ACQ_ADAPTER_INCLUDE_DIRS ${OPT_ACQ_ADAPTER_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS})
+endif(ENABLE_CUDA)
 
 set(ACQ_ADAPTER_SOURCES
     gps_l1_ca_pcps_acquisition.cc
@@ -34,15 +46,8 @@ set(ACQ_ADAPTER_SOURCES
     galileo_e5a_pcps_acquisition.cc
     glonass_l1_ca_pcps_acquisition.cc
     glonass_l2_ca_pcps_acquisition.cc
+    ${OPT_ACQ_ADAPTERS}
 )
-
-if(ENABLE_FPGA)
-    set(ACQ_ADAPTER_SOURCES ${ACQ_ADAPTER_SOURCES} gps_l1_ca_pcps_acquisition_fpga.cc)
-endif(ENABLE_FPGA)
-    
-if(OPENCL_FOUND)
-    set(ACQ_ADAPTER_SOURCES ${ACQ_ADAPTER_SOURCES} gps_l1_ca_pcps_opencl_acquisition.cc)
-endif(OPENCL_FOUND)
 
 include_directories(
      ${CMAKE_CURRENT_SOURCE_DIR}
@@ -59,6 +64,7 @@ include_directories(
      ${GNURADIO_RUNTIME_INCLUDE_DIRS}
      ${GNURADIO_BLOCKS_INCLUDE_DIRS}
      ${VOLK_GNSSSDR_INCLUDE_DIRS}
+     ${OPT_ACQ_ADAPTER_INCLUDE_DIRS}
 )
 
 file(GLOB ACQ_ADAPTER_HEADERS "*.h")

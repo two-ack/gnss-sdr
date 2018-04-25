@@ -20,7 +20,7 @@
 if(ENABLE_CUDA)
     # Append current NVCC flags by something, eg comput capability
     # set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --gpu-architecture sm_30)
-    list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_30,code=sm_30; -std=c++11;-O3; -use_fast_math -default-stream per-thread")
+    list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_62,code=sm_62; -std=c++11;-O3; -use_fast_math -default-stream per-thread")
     set(CUDA_PROPAGATE_HOST_FLAGS OFF)
     CUDA_INCLUDE_DIRECTORIES( ${CMAKE_CURRENT_SOURCE_DIR})
     set(LIB_TYPE STATIC) #set the lib type

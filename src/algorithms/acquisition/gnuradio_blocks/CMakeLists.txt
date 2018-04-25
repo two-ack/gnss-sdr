@@ -16,7 +16,6 @@
 # along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 set(ACQ_GR_BLOCKS_SOURCES
     pcps_acquisition.cc
     pcps_assisted_acquisition_cc.cc
@@ -49,7 +48,19 @@ include_directories(
      ${GNURADIO_RUNTIME_INCLUDE_DIRS}
      ${VOLK_GNSSSDR_INCLUDE_DIRS}
      ${MATIO_INCLUDE_DIRS}
+     ${OPT_ACQ_GR_BLOCK_INCLUDES}
 )
+
+if(ENABLE_CUDA)
+    list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_62,code=sm_62; -std=c++11;-O3; -use_fast_math -default-stream per-thread")
+    set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+    cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+    set(LIB_TYPE STATIC)
+    cuda_add_library(pcps_cuda_acquisition_block ${LIB_TYPE} pcps_cuda_acquisition.h pcps_cuda_acquisition.cu)
+    cuda_add_cufft_to_target(pcps_cuda_acquisition_block)
+    set(OPT_ACQ_GR_BLOCKS ${OPT_ACQ_GR_BLOCKS} pcps_cuda_acquisition_block)
+    set(OPT_ACQ_GR_BLOCK_INCLUDES ${OPT_ACQ_GR_BLOCK_INCLUDES} ${CUDA_INCLUDE_DIRS})
+endif(ENABLE_CUDA)
 
 
 if(OPENCL_FOUND)
@@ -66,11 +77,16 @@ list(SORT ACQ_GR_BLOCKS_HEADERS)
 add_library(acq_gr_blocks ${ACQ_GR_BLOCKS_SOURCES} ${ACQ_GR_BLOCKS_HEADERS})
 source_group(Headers FILES ${ACQ_GR_BLOCKS_HEADERS}) 
 
+target_link_libraries(acq_gr_blocks gnss_sp_libs gnss_system_parameters ${GNURADIO_RUNTIME_LIBRARIES} ${GNURADIO_FFT_LIBRARIES} ${VOLK_LIBRARIES} ${VOLK_GNSSSDR_LIBRARIES} ${OPT_LIBRARIES} ${OPT_ACQUISITION_LIBRARIES} ${MATIO_LIBRARIES})
+
 if(ENABLE_FPGA)
-	target_link_libraries(acq_gr_blocks acquisition_lib gnss_sp_libs gnss_system_parameters ${GNURADIO_RUNTIME_LIBRARIES} ${GNURADIO_FFT_LIBRARIES} ${VOLK_LIBRARIES} ${VOLK_GNSSSDR_LIBRARIES} ${OPT_LIBRARIES} ${OPT_ACQUISITION_LIBRARIES})
-else(ENABLE_FPGA)
-	target_link_libraries(acq_gr_blocks gnss_sp_libs gnss_system_parameters ${GNURADIO_RUNTIME_LIBRARIES} ${GNURADIO_FFT_LIBRARIES} ${VOLK_LIBRARIES} ${VOLK_GNSSSDR_LIBRARIES} ${OPT_LIBRARIES} ${OPT_ACQUISITION_LIBRARIES} ${MATIO_LIBRARIES})
+	target_link_libraries(acq_gr_blocks acquisition_lib)
 endif(ENABLE_FPGA)
+
+if(ENABLE_CUDA)
+    target_link_libraries(acq_gr_blocks pcps_cuda_acquisition_block)
+endif(ENABLE_CUDA)
+
 
 if(NOT VOLK_GNSSSDR_FOUND)
     add_dependencies(acq_gr_blocks volk_gnsssdr_module)

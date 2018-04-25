@@ -142,6 +142,7 @@
 
 #if CUDA_GPU_ACCEL
 #include "gps_l1_ca_dll_pll_tracking_gpu.h"
+#include "gps_l1_ca_pcps_cuda_acquisition.h"
 #endif
 
 #include <boost/lexical_cast.hpp>
@@ -1326,6 +1327,16 @@ std::unique_ptr<GNSSBlockInterface> GNSSBlockFactory::GetBlock(
         }
 #endif
 
+
+#if CUDA_GPU_ACCEL
+    else if (implementation.compare("GPS_L1_CA_PCPS_CUDA_Acquisition") == 0)
+        {
+            std::unique_ptr<GNSSBlockInterface> block_(new GpsL1CaPcpsCUDAAcquisition(configuration.get(), role, in_streams,
+                out_streams));
+            block = std::move(block_);
+        }
+#endif
+
     else if (implementation.compare("GPS_L1_CA_PCPS_Acquisition_Fine_Doppler") == 0)
         {
             std::unique_ptr<GNSSBlockInterface> block_(new GpsL1CaPcpsAcquisitionFineDoppler(configuration.get(), role, in_streams,
@@ -1615,6 +1626,16 @@ std::unique_ptr<AcquisitionInterface> GNSSBlockFactory::GetAcqBlock(
         {
             std::unique_ptr<AcquisitionInterface> block_(new GpsL1CaPcpsOpenClAcquisition(configuration.get(), role, in_streams,
                 out_streams));
+            block = std::move(block_);
+        }
+#endif
+
+
+#if CUDA_GPU_ACCEL
+    else if (implementation.compare("GPS_L1_CA_PCPS_CUDA_Acquisition") == 0)
+        {
+            std::unique_ptr<AcquisitionInterface> block_(new GpsL1CaPcpsCUDAAcquisition(configuration.get(), role, in_streams,
+                                                                                      out_streams));
             block = std::move(block_);
         }
 #endif
