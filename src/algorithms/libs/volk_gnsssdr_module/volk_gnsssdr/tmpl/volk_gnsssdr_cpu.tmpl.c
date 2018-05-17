@@ -156,6 +156,16 @@ static int has_neon(void)
     return 0;
 #endif
 }
+
+static int has_neon64(void)
+{
+#if defined(__aarch64__) && defined(__linux__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
 // clang-format off
 
 %for arch in archs:

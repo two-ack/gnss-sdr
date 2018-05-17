@@ -497,4 +497,65 @@ static inline void volk_gnsssdr_8ic_x2_dot_prod_8ic_neon(lv_8sc_t* result, const
 }
 #endif /* LV_HAVE_NEON */
 
+#ifdef LV_HAVE_NEON64
+#include <arm_neon.h>
+
+static inline void volk_gnsssdr_8ic_x2_dot_prod_8ic_neon64(lv_8sc_t* result, const lv_8sc_t* in_a, const lv_8sc_t* in_b, unsigned int num_points)
+{
+    lv_8sc_t dotProduct;
+    dotProduct = lv_cmake(0, 0);
+    *result = lv_cmake(0, 0);
+
+    const lv_8sc_t* a = in_a;
+    const lv_8sc_t* b = in_b;
+    // for 2-lane vectors, 1st lane holds the real part,
+    // 2nd lane holds the imaginary part
+    int8x8x2_t a_val, b_val, c_val, accumulator, tmp_real, tmp_imag;
+    __VOLK_ATTR_ALIGNED(16)
+    lv_8sc_t accum_result[8] = {lv_cmake(0, 0)};
+    accumulator.val[0] = vdup_n_s8(0);
+    accumulator.val[1] = vdup_n_s8(0);
+    unsigned int number;
+
+    const unsigned int neon_iters = num_points / 8;
+
+    for (number = 0; number < neon_iters; ++number)
+        {
+            a_val = vld2_s8((const int8_t*)a);
+            b_val = vld2_s8((const int8_t*)b);
+            __VOLK_GNSSSDR_PREFETCH(a + 16);
+            __VOLK_GNSSSDR_PREFETCH(b + 16);
+
+            // multiply the real*real and imag*imag to get real result
+            tmp_real.val[0] = vmul_s8(a_val.val[0], b_val.val[0]);
+            tmp_real.val[1] = vmul_s8(a_val.val[1], b_val.val[1]);
+
+            // Multiply cross terms to get the imaginary result
+            tmp_imag.val[0] = vmul_s8(a_val.val[0], b_val.val[1]);
+            tmp_imag.val[1] = vmul_s8(a_val.val[1], b_val.val[0]);
+
+            c_val.val[0] = vsub_s8(tmp_real.val[0], tmp_real.val[1]);
+            c_val.val[1] = vadd_s8(tmp_imag.val[0], tmp_imag.val[1]);
+
+            accumulator.val[0] = vadd_s8(accumulator.val[0], c_val.val[0]);
+            accumulator.val[1] = vadd_s8(accumulator.val[1], c_val.val[1]);
+
+            a += 8;
+            b += 8;
+        }
+    vst2_s8((int8_t*)accum_result, accumulator);
+    for (number = 0; number < 8; ++number)
+        {
+            *result += accum_result[number];
+        }
+
+    for (number = neon_iters * 8; number < num_points; ++number)
+        {
+            dotProduct += (*a++) * (*b++);
+        }
+
+    *result += dotProduct;
+}
+#endif /* LV_HAVE_NEON64 */
+
 #endif /*INCLUDED_volk_gnsssdr_8ic_x2_dot_prod_8ic_H*/

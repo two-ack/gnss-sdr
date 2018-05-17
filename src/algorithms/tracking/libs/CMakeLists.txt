@@ -17,20 +17,6 @@
 #
 
 
-if(ENABLE_CUDA)
-    # Append current NVCC flags by something, eg comput capability
-    # set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --gpu-architecture sm_30)
-    list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_62,code=sm_62; -std=c++11;-O3; -use_fast_math -default-stream per-thread")
-    set(CUDA_PROPAGATE_HOST_FLAGS OFF)
-    CUDA_INCLUDE_DIRECTORIES( ${CMAKE_CURRENT_SOURCE_DIR})
-    set(LIB_TYPE STATIC) #set the lib type
-    CUDA_ADD_LIBRARY(CUDA_CORRELATOR_LIB ${LIB_TYPE} cuda_multicorrelator.h cuda_multicorrelator.cu)
-    set(OPT_TRACKING_LIBRARIES ${OPT_TRACKING_LIBRARIES} CUDA_CORRELATOR_LIB)
-    set(OPT_TRACKING_INCLUDES ${OPT_TRACKING_INCLUDES} ${CUDA_INCLUDE_DIRS} )
-endif(ENABLE_CUDA)
-
-
-
 set(TRACKING_LIB_SOURCES
      cpu_multicorrelator.cc
      cpu_multicorrelator_real_codes.cc
@@ -60,6 +46,23 @@ include_directories(
      ${OPT_TRACKING_INCLUDES}
      ${VOLK_GNSSSDR_INCLUDE_DIRS}
 )
+
+if(ENABLE_CUDA)
+    # Append current NVCC flags by something, eg comput capability
+    # set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --gpu-architecture sm_30)
+    list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_62,code=sm_62; -std=c++11;-O3; -use_fast_math -default-stream per-thread")
+    set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+    CUDA_INCLUDE_DIRECTORIES(
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_SOURCE_DIR}/src/algorithms/libs
+    )
+    set(LIB_TYPE STATIC) #set the lib type
+    CUDA_ADD_LIBRARY(CUDA_CORRELATOR_LIB ${LIB_TYPE} cuda_multicorrelator.h cuda_multicorrelator.cu cuda_multicorrelator_real_codes.h cuda_multicorrelator_real_codes.cu)
+    add_dependencies(CUDA_CORRELATOR_LIB cuda_kernels_lib)
+    target_link_libraries(CUDA_CORRELATOR_LIB cuda_kernels_lib)
+    set(OPT_TRACKING_LIBRARIES ${OPT_TRACKING_LIBRARIES} CUDA_CORRELATOR_LIB)
+    set(OPT_TRACKING_INCLUDES ${OPT_TRACKING_INCLUDES} ${CUDA_INCLUDE_DIRS} )
+endif(ENABLE_CUDA)
 
 if(ENABLE_GENERIC_ARCH)
     add_definitions( -DGENERIC_ARCH=1 )

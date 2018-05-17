@@ -142,6 +142,7 @@
 
 #if CUDA_GPU_ACCEL
 #include "gps_l1_ca_dll_pll_tracking_gpu.h"
+#include "gps_l1_ca_dll_pll_tracking_cuda.h"
 #include "gps_l1_ca_pcps_cuda_acquisition.h"
 #endif
 
@@ -1461,6 +1462,12 @@ std::unique_ptr<GNSSBlockInterface> GNSSBlockFactory::GetBlock(
                 out_streams));
             block = std::move(block_);
         }
+    else if (implementation.compare("GPS_L1_CA_DLL_PLL_Tracking_CUDA") == 0)
+        {
+            std::unique_ptr<GNSSBlockInterface> block_(new GpsL1CaDllPllTrackingCUDA(configuration.get(), role, in_streams,
+                                                                                    out_streams));
+            block = std::move(block_);
+        }
 #endif
     else if (implementation.compare("Galileo_E1_DLL_PLL_VEML_Tracking") == 0)
         {
@@ -1798,6 +1805,12 @@ std::unique_ptr<TrackingInterface> GNSSBlockFactory::GetTrkBlock(
         {
             std::unique_ptr<TrackingInterface> block_(new GpsL1CaDllPllTrackingGPU(configuration.get(), role, in_streams,
                 out_streams));
+            block = std::move(block_);
+        }
+    else if (implementation.compare("GPS_L1_CA_DLL_PLL_Tracking_CUDA") == 0)
+        {
+            std::unique_ptr<TrackingInterface> block_(new GpsL1CaDllPllTrackingCUDA(configuration.get(), role, in_streams,
+                                                                                   out_streams));
             block = std::move(block_);
         }
 #endif

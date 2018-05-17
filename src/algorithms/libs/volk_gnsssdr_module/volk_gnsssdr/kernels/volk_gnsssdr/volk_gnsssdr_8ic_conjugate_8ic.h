@@ -376,4 +376,32 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_neon(lv_8sc_t* cVector, const 
 }
 #endif /* LV_HAVE_NEON */
 
+#ifdef LV_HAVE_NEON64
+#include <arm_neon.h>
+
+static inline void volk_gnsssdr_8ic_conjugate_8ic_neon64(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
+{
+    const unsigned int sse_iters = num_points / 8;
+    unsigned int i;
+    lv_8sc_t* c = cVector;
+    const lv_8sc_t* a = aVector;
+    int8x8x2_t a_val;
+
+    for (i = 0; i < sse_iters; ++i)
+        {
+            a_val = vld2_s8((const int8_t*)a);
+            __VOLK_GNSSSDR_PREFETCH(a + 16);
+            a_val.val[1] = vneg_s8(a_val.val[1]);
+            vst2_s8((int8_t*)c, a_val);
+            a += 8;
+            c += 8;
+        }
+
+    for (i = sse_iters * 8; i < num_points; ++i)
+        {
+            *c++ = lv_conj(*a++);
+        }
+}
+#endif /* LV_HAVE_NEON64 */
+
 #endif /* INCLUDED_volk_gnsssdr_8ic_conjugate_8ic_H */

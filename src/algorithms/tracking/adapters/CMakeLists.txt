@@ -17,7 +17,7 @@
 #
 
 if(ENABLE_CUDA)
-     set(OPT_TRACKING_ADAPTERS ${OPT_TRACKING_ADAPTERS} gps_l1_ca_dll_pll_tracking_gpu.cc)
+     set(OPT_TRACKING_ADAPTERS ${OPT_TRACKING_ADAPTERS} gps_l1_ca_dll_pll_tracking_gpu.cc gps_l1_ca_dll_pll_tracking_cuda.cc)
      set(OPT_TRACKING_INCLUDE_DIRS ${OPT_TRACKING_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS})
 endif(ENABLE_CUDA)
 

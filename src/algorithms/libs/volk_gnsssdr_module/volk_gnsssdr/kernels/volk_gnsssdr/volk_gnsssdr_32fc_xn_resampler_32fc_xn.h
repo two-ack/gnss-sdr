@@ -768,5 +768,91 @@ static inline void volk_gnsssdr_32fc_xn_resampler_32fc_xn_neon(lv_32fc_t** resul
 
 #endif
 
+#ifdef LV_HAVE_NEON64
+#include <arm_neon.h>
+
+static inline void volk_gnsssdr_32fc_xn_resampler_32fc_xn_neon64(lv_32fc_t** result, const lv_32fc_t* local_code, float rem_code_phase_chips, float code_phase_step_chips, float* shifts_chips, unsigned int code_length_chips, int num_out_vectors, unsigned int num_points)
+{
+    lv_32fc_t** _result = result;
+    const unsigned int neon_iters = num_points / 4;
+    int current_correlator_tap;
+    unsigned int n;
+    unsigned int k;
+    const int32x4_t ones = vdupq_n_s32(1);
+    const float32x4_t fours = vdupq_n_f32(4.0f);
+    const float32x4_t rem_code_phase_chips_reg = vdupq_n_f32(rem_code_phase_chips);
+    const float32x4_t code_phase_step_chips_reg = vdupq_n_f32(code_phase_step_chips);
+
+    __VOLK_ATTR_ALIGNED(16)
+    int32_t local_code_chip_index[4];
+    int32_t local_code_chip_index_;
+
+    const int32x4_t zeros = vdupq_n_s32(0);
+    const float32x4_t code_length_chips_reg_f = vdupq_n_f32((float)code_length_chips);
+    const int32x4_t code_length_chips_reg_i = vdupq_n_s32((int32_t)code_length_chips);
+    int32x4_t local_code_chip_index_reg, aux_i, negatives, i;
+    float32x4_t aux, aux2, shifts_chips_reg, fi, c, j, cTrunc, base, indexn, reciprocal;
+    __VOLK_ATTR_ALIGNED(16)
+    const float vec[4] = {0.0f, 1.0f, 2.0f, 3.0f};
+    uint32x4_t igx;
+    reciprocal = vrecpeq_f32(code_length_chips_reg_f);
+    reciprocal = vmulq_f32(vrecpsq_f32(code_length_chips_reg_f, reciprocal), reciprocal);
+    reciprocal = vmulq_f32(vrecpsq_f32(code_length_chips_reg_f, reciprocal), reciprocal);  // this refinement is required!
+    float32x4_t n0 = vld1q_f32((float*)vec);
+
+    for (current_correlator_tap = 0; current_correlator_tap < num_out_vectors; current_correlator_tap++)
+        {
+            shifts_chips_reg = vdupq_n_f32((float)shifts_chips[current_correlator_tap]);
+            aux2 = vsubq_f32(shifts_chips_reg, rem_code_phase_chips_reg);
+            indexn = n0;
+            for (n = 0; n < neon_iters; n++)
+                {
+                    __VOLK_GNSSSDR_PREFETCH_LOCALITY(&_result[current_correlator_tap][4 * n + 3], 1, 0);
+                    __VOLK_GNSSSDR_PREFETCH(&local_code_chip_index[4]);
+                    aux = vmulq_f32(code_phase_step_chips_reg, indexn);
+                    aux = vaddq_f32(aux, aux2);
+
+                    //floor
+                    i = vcvtq_s32_f32(aux);
+                    fi = vcvtq_f32_s32(i);
+                    igx = vcgtq_f32(fi, aux);
+                    j = vcvtq_f32_s32(vandq_s32(vreinterpretq_s32_u32(igx), ones));
+                    aux = vsubq_f32(fi, j);
+
+                    // fmod
+                    c = vmulq_f32(aux, reciprocal);
+                    i = vcvtq_s32_f32(c);
+                    cTrunc = vcvtq_f32_s32(i);
+                    base = vmulq_f32(cTrunc, code_length_chips_reg_f);
+                    aux = vsubq_f32(aux, base);
+                    local_code_chip_index_reg = vcvtq_s32_f32(aux);
+
+                    negatives = vreinterpretq_s32_u32(vcltq_s32(local_code_chip_index_reg, zeros));
+                    aux_i = vandq_s32(code_length_chips_reg_i, negatives);
+                    local_code_chip_index_reg = vaddq_s32(local_code_chip_index_reg, aux_i);
+
+                    vst1q_s32((int32_t*)local_code_chip_index, local_code_chip_index_reg);
+
+                    for (k = 0; k < 4; ++k)
+                        {
+                            _result[current_correlator_tap][n * 4 + k] = local_code[local_code_chip_index[k]];
+                        }
+                    indexn = vaddq_f32(indexn, fours);
+                }
+            for (n = neon_iters * 4; n < num_points; n++)
+                {
+                    __VOLK_GNSSSDR_PREFETCH_LOCALITY(&_result[current_correlator_tap][n], 1, 0);
+                    // resample code for current tap
+                    local_code_chip_index_ = (int)floor(code_phase_step_chips * (float)n + shifts_chips[current_correlator_tap] - rem_code_phase_chips);
+                    //Take into account that in multitap correlators, the shifts can be negative!
+                    if (local_code_chip_index_ < 0) local_code_chip_index_ += (int)code_length_chips * (abs(local_code_chip_index_) / code_length_chips + 1);
+                    local_code_chip_index_ = local_code_chip_index_ % code_length_chips;
+                    _result[current_correlator_tap][n] = local_code[local_code_chip_index_];
+                }
+        }
+}
+
+#endif
+
 
 #endif /*INCLUDED_volk_gnsssdr_32fc_xn_resampler_32fc_xn_H*/

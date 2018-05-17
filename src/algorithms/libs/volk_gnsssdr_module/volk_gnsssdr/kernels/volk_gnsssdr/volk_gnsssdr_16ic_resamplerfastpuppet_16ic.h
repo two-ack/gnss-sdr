@@ -84,4 +84,16 @@ static inline void volk_gnsssdr_16ic_resamplerfastpuppet_16ic_neon(lv_16sc_t* re
 
 #endif /* LV_HAVE_NEON */
 
+#ifdef LV_HAVE_NEON64
+
+static inline void volk_gnsssdr_16ic_resamplerfastpuppet_16ic_neon64(lv_16sc_t* result, const lv_16sc_t* local_code, unsigned int num_points)
+{
+    float rem_code_phase_chips = -0.123;
+    float code_phase_step_chips = 0.1;
+    int code_length_chips = 1023;
+    volk_gnsssdr_16ic_resampler_fast_16ic_neon64(result, local_code, rem_code_phase_chips, code_phase_step_chips, code_length_chips, num_points);
+}
+
+#endif /* LV_HAVE_NEON64 */
+
 #endif  // INCLUDED_volk_gnsssdr_16ic_resamplerfastpuppet_16ic_H

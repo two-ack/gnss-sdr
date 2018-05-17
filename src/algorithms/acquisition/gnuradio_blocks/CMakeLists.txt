@@ -54,10 +54,15 @@ include_directories(
 if(ENABLE_CUDA)
     list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_62,code=sm_62; -std=c++11;-O3; -use_fast_math -default-stream per-thread")
     set(CUDA_PROPAGATE_HOST_FLAGS OFF)
-    cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+    cuda_include_directories(
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_SOURCE_DIR}/src/algorithms/libs
+    )
     set(LIB_TYPE STATIC)
     cuda_add_library(pcps_cuda_acquisition_block ${LIB_TYPE} pcps_cuda_acquisition.h pcps_cuda_acquisition.cu)
     cuda_add_cufft_to_target(pcps_cuda_acquisition_block)
+    add_dependencies(pcps_cuda_acquisition_block cuda_kernels_lib)
+    target_link_libraries(pcps_cuda_acquisition_block cuda_kernels_lib)
     set(OPT_ACQ_GR_BLOCKS ${OPT_ACQ_GR_BLOCKS} pcps_cuda_acquisition_block)
     set(OPT_ACQ_GR_BLOCK_INCLUDES ${OPT_ACQ_GR_BLOCK_INCLUDES} ${CUDA_INCLUDE_DIRS})
 endif(ENABLE_CUDA)

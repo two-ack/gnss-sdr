@@ -168,5 +168,36 @@ static inline void volk_gnsssdr_16ic_rotatorpuppet_16ic_neon_reload(lv_16sc_t* o
 
 #endif /* LV_HAVE_NEON */
 
+#ifdef LV_HAVE_NEON64
+static inline void volk_gnsssdr_16ic_rotatorpuppet_16ic_neon64(lv_16sc_t* outVector, const lv_16sc_t* inVector, unsigned int num_points)
+{
+    // phases must be normalized. Phase rotator expects a complex exponential input!
+    float rem_carrier_phase_in_rad = 0.345;
+    float phase_step_rad = 0.123;
+    lv_32fc_t phase[1];
+    phase[0] = lv_cmake(cos(rem_carrier_phase_in_rad), -sin(rem_carrier_phase_in_rad));
+    lv_32fc_t phase_inc[1];
+    phase_inc[0] = lv_cmake(cos(phase_step_rad), -sin(phase_step_rad));
+    volk_gnsssdr_16ic_s32fc_x2_rotator_16ic_neon64(outVector, inVector, phase_inc[0], phase, num_points);
+}
+
+#endif /* LV_HAVE_NEON64 */
+
+
+#ifdef LV_HAVE_NEON64
+static inline void volk_gnsssdr_16ic_rotatorpuppet_16ic_neon64_reload(lv_16sc_t* outVector, const lv_16sc_t* inVector, unsigned int num_points)
+{
+    // phases must be normalized. Phase rotator expects a complex exponential input!
+    float rem_carrier_phase_in_rad = 0.345;
+    float phase_step_rad = 0.123;
+    lv_32fc_t phase[1];
+    phase[0] = lv_cmake(cos(rem_carrier_phase_in_rad), -sin(rem_carrier_phase_in_rad));
+    lv_32fc_t phase_inc[1];
+    phase_inc[0] = lv_cmake(cos(phase_step_rad), -sin(phase_step_rad));
+    volk_gnsssdr_16ic_s32fc_x2_rotator_16ic_neon64_reload(outVector, inVector, phase_inc[0], phase, num_points);
+}
+
+#endif /* LV_HAVE_NEON64 */
+
 
 #endif /* INCLUDED_volk_gnsssdr_16ic_rotatorpuppet_16ic_H */

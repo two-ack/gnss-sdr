@@ -17,7 +17,7 @@
 #
 
 if(ENABLE_CUDA)
-     set(OPT_TRACKING_BLOCKS ${OPT_TRACKING_BLOCKS} gps_l1_ca_dll_pll_tracking_gpu_cc.cc)
+     set(OPT_TRACKING_BLOCKS ${OPT_TRACKING_BLOCKS} gps_l1_ca_dll_pll_tracking_gpu_cc.cc dll_pll_veml_cuda_tracking.cc)
      set(OPT_TRACKING_INCLUDES ${OPT_TRACKING_INCLUDES} ${CUDA_INCLUDE_DIRS})
      set(OPT_TRACKING_LIBRARIES ${OPT_TRACKING_LIBRARIES} ${CUDA_LIBRARIES})
 endif(ENABLE_CUDA)

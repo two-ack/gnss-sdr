@@ -950,4 +950,121 @@ static inline void volk_gnsssdr_s32f_sincos_32fc_neon(lv_32fc_t *out, const floa
 
 #endif /* LV_HAVE_NEON  */
 
+#ifdef LV_HAVE_NEON64
+#include <arm_neon.h>
+/* Adapted from http://gruntthepeon.free.fr/ssemath/neon_mathfun.h, original code from Julien Pommier  */
+/* Based on algorithms from the cephes library http://www.netlib.org/cephes/   */
+static inline void volk_gnsssdr_s32f_sincos_32fc_neon64(lv_32fc_t *out, const float phase_inc, float *phase, unsigned int num_points)
+{
+    lv_32fc_t *bPtr = out;
+    const unsigned int neon_iters = num_points / 4;
+    float _phase = (*phase);
+
+    __VOLK_ATTR_ALIGNED(16)
+    float32_t four_phases[4] = {_phase, _phase + phase_inc, _phase + 2 * phase_inc, _phase + 3 * phase_inc};
+    float four_inc = 4 * phase_inc;
+    __VOLK_ATTR_ALIGNED(16)
+    float32_t four_phases_inc[4] = {four_inc, four_inc, four_inc, four_inc};
+
+    float32x4_t four_phases_reg = vld1q_f32(four_phases);
+    float32x4_t four_phases_inc_reg = vld1q_f32(four_phases_inc);
+
+    const float32_t c_minus_cephes_DP1 = -0.78515625;
+    const float32_t c_minus_cephes_DP2 = -2.4187564849853515625e-4;
+    const float32_t c_minus_cephes_DP3 = -3.77489497744594108e-8;
+    const float32_t c_sincof_p0 = -1.9515295891E-4;
+    const float32_t c_sincof_p1 = 8.3321608736E-3;
+    const float32_t c_sincof_p2 = -1.6666654611E-1;
+    const float32_t c_coscof_p0 = 2.443315711809948E-005;
+    const float32_t c_coscof_p1 = -1.388731625493765E-003;
+    const float32_t c_coscof_p2 = 4.166664568298827E-002;
+    const float32_t c_cephes_FOPI = 1.27323954473516;
+
+    unsigned int number = 0;
+
+    float32x4_t x, xmm1, xmm2, xmm3, y, y1, y2, ys, yc, z;
+    float32x4x2_t result;
+
+    uint32x4_t emm2, poly_mask, sign_mask_sin, sign_mask_cos;
+
+    for (; number < neon_iters; number++)
+        {
+            x = four_phases_reg;
+
+            sign_mask_sin = vcltq_f32(x, vdupq_n_f32(0));
+            x = vabsq_f32(x);
+
+            /* scale by 4/Pi */
+            y = vmulq_f32(x, vdupq_n_f32(c_cephes_FOPI));
+
+            /* store the integer part of y in mm0 */
+            emm2 = vcvtq_u32_f32(y);
+            /* j=(j+1) & (~1) (see the cephes sources) */
+            emm2 = vaddq_u32(emm2, vdupq_n_u32(1));
+            emm2 = vandq_u32(emm2, vdupq_n_u32(~1));
+            y = vcvtq_f32_u32(emm2);
+
+            /* get the polynom selection mask
+                    there is one polynom for 0 <= x <= Pi/4
+                    and another one for Pi/4<x<=Pi/2
+
+                    Both branches will be computed.
+             */
+            poly_mask = vtstq_u32(emm2, vdupq_n_u32(2));
+
+            /* The magic pass: "Extended precision modular arithmetic"
+                    x = ((x - y * DP1) - y * DP2) - y * DP3; */
+            xmm1 = vmulq_n_f32(y, c_minus_cephes_DP1);
+            xmm2 = vmulq_n_f32(y, c_minus_cephes_DP2);
+            xmm3 = vmulq_n_f32(y, c_minus_cephes_DP3);
+            x = vaddq_f32(x, xmm1);
+            x = vaddq_f32(x, xmm2);
+            x = vaddq_f32(x, xmm3);
+
+            sign_mask_sin = veorq_u32(sign_mask_sin, vtstq_u32(emm2, vdupq_n_u32(4)));
+            sign_mask_cos = vtstq_u32(vsubq_u32(emm2, vdupq_n_u32(2)), vdupq_n_u32(4));
+
+            /* Evaluate the first polynom  (0 <= x <= Pi/4) in y1,
+                    and the second polynom      (Pi/4 <= x <= 0) in y2 */
+            z = vmulq_f32(x, x);
+
+            y1 = vmulq_n_f32(z, c_coscof_p0);
+            y2 = vmulq_n_f32(z, c_sincof_p0);
+            y1 = vaddq_f32(y1, vdupq_n_f32(c_coscof_p1));
+            y2 = vaddq_f32(y2, vdupq_n_f32(c_sincof_p1));
+            y1 = vmulq_f32(y1, z);
+            y2 = vmulq_f32(y2, z);
+            y1 = vaddq_f32(y1, vdupq_n_f32(c_coscof_p2));
+            y2 = vaddq_f32(y2, vdupq_n_f32(c_sincof_p2));
+            y1 = vmulq_f32(y1, z);
+            y2 = vmulq_f32(y2, z);
+            y1 = vmulq_f32(y1, z);
+            y2 = vmulq_f32(y2, x);
+            y1 = vsubq_f32(y1, vmulq_f32(z, vdupq_n_f32(0.5f)));
+            y2 = vaddq_f32(y2, x);
+            y1 = vaddq_f32(y1, vdupq_n_f32(1));
+
+            /* select the correct result from the two polynoms */
+            ys = vbslq_f32(poly_mask, y1, y2);
+            yc = vbslq_f32(poly_mask, y2, y1);
+            result.val[1] = vbslq_f32(sign_mask_sin, vnegq_f32(ys), ys);
+            result.val[0] = vbslq_f32(sign_mask_cos, yc, vnegq_f32(yc));
+
+            vst2q_f32((float32_t *)bPtr, result);
+            bPtr += 4;
+
+            four_phases_reg = vaddq_f32(four_phases_reg, four_phases_inc_reg);
+        }
+
+    _phase = _phase + phase_inc * (neon_iters * 4);
+    for (number = neon_iters * 4; number < num_points; number++)
+        {
+            *bPtr++ = lv_cmake((float)cosf(_phase), (float)sinf(_phase));
+            _phase += phase_inc;
+        }
+    (*phase) = _phase;
+}
+
+#endif /* LV_HAVE_NEON64  */
+
 #endif /* INCLUDED_volk_gnsssdr_s32f_sincos_32fc_H */

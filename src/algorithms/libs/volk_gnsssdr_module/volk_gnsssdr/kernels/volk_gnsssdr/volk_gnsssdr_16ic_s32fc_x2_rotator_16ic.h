@@ -974,4 +974,333 @@ static inline void volk_gnsssdr_16ic_s32fc_x2_rotator_16ic_neon_reload(lv_16sc_t
 
 #endif /* LV_HAVE_NEON */
 
+#ifdef LV_HAVE_NEON64
+#include <arm_neon.h>
+
+static inline void volk_gnsssdr_16ic_s32fc_x2_rotator_16ic_neon64(lv_16sc_t* outVector, const lv_16sc_t* inVector, const lv_32fc_t phase_inc, lv_32fc_t* phase, unsigned int num_points)
+{
+    unsigned int i = 0;
+    const unsigned int neon_iters = num_points / 4;
+    lv_16sc_t tmp16_;
+    lv_32fc_t tmp32_;
+
+    float arg_phase0 = cargf(*phase);
+    float arg_phase_inc = cargf(phase_inc);
+    float phase_est = 0.0;
+
+    const lv_16sc_t* _in = inVector;
+    lv_16sc_t* _out = outVector;
+
+    lv_32fc_t ___phase4 = phase_inc * phase_inc * phase_inc * phase_inc;
+    __VOLK_ATTR_ALIGNED(16)
+    float32_t __phase4_real[4] = {lv_creal(___phase4), lv_creal(___phase4), lv_creal(___phase4), lv_creal(___phase4)};
+    __VOLK_ATTR_ALIGNED(16)
+    float32_t __phase4_imag[4] = {lv_cimag(___phase4), lv_cimag(___phase4), lv_cimag(___phase4), lv_cimag(___phase4)};
+
+    float32x4_t _phase4_real = vld1q_f32(__phase4_real);
+    float32x4_t _phase4_imag = vld1q_f32(__phase4_imag);
+
+    lv_32fc_t phase2 = (lv_32fc_t)(*phase) * phase_inc;
+    lv_32fc_t phase3 = phase2 * phase_inc;
+    lv_32fc_t phase4 = phase3 * phase_inc;
+
+    __VOLK_ATTR_ALIGNED(16)
+    float32_t __phase_real[4] = {lv_creal((*phase)), lv_creal(phase2), lv_creal(phase3), lv_creal(phase4)};
+    __VOLK_ATTR_ALIGNED(16)
+    float32_t __phase_imag[4] = {lv_cimag((*phase)), lv_cimag(phase2), lv_cimag(phase3), lv_cimag(phase4)};
+
+    float32x4_t _phase_real = vld1q_f32(__phase_real);
+    float32x4_t _phase_imag = vld1q_f32(__phase_imag);
+
+    float32x4_t half = vdupq_n_f32(0.5f);
+    int16x4x2_t tmp16;
+    int32x4x2_t tmp32i;
+    float32x4x2_t tmp32f, tmp_real, tmp_imag;
+    float32x4_t sign, PlusHalf, Round;
+
+    if (neon_iters > 0)
+        {
+            for (; i < neon_iters; ++i)
+                {
+                    /* load 4 complex numbers (int 16 bits each component) */
+                    tmp16 = vld2_s16((int16_t*)_in);
+                    __VOLK_GNSSSDR_PREFETCH(_in + 8);
+                    _in += 4;
+
+                    /* promote them to int 32 bits */
+                    tmp32i.val[0] = vmovl_s16(tmp16.val[0]);
+                    tmp32i.val[1] = vmovl_s16(tmp16.val[1]);
+
+                    /* promote them to float 32 bits */
+                    tmp32f.val[0] = vcvtq_f32_s32(tmp32i.val[0]);
+                    tmp32f.val[1] = vcvtq_f32_s32(tmp32i.val[1]);
+
+                    /* complex multiplication of four complex samples (float 32 bits each component) */
+                    tmp_real.val[0] = vmulq_f32(tmp32f.val[0], _phase_real);
+                    tmp_real.val[1] = vmulq_f32(tmp32f.val[1], _phase_imag);
+                    tmp_imag.val[0] = vmulq_f32(tmp32f.val[0], _phase_imag);
+                    tmp_imag.val[1] = vmulq_f32(tmp32f.val[1], _phase_real);
+
+                    tmp32f.val[0] = vsubq_f32(tmp_real.val[0], tmp_real.val[1]);
+                    tmp32f.val[1] = vaddq_f32(tmp_imag.val[0], tmp_imag.val[1]);
+
+                    /* downcast results to int32 */
+                    /* in __aarch64__ we can do that with vcvtaq_s32_f32(ret1); vcvtaq_s32_f32(ret2); */
+                    sign = vcvtq_f32_u32((vshrq_n_u32(vreinterpretq_u32_f32(tmp32f.val[0]), 31)));
+                    PlusHalf = vaddq_f32(tmp32f.val[0], half);
+                    Round = vsubq_f32(PlusHalf, sign);
+                    tmp32i.val[0] = vcvtq_s32_f32(Round);
+
+                    sign = vcvtq_f32_u32((vshrq_n_u32(vreinterpretq_u32_f32(tmp32f.val[1]), 31)));
+                    PlusHalf = vaddq_f32(tmp32f.val[1], half);
+                    Round = vsubq_f32(PlusHalf, sign);
+                    tmp32i.val[1] = vcvtq_s32_f32(Round);
+
+                    /* downcast results to int16 */
+                    tmp16.val[0] = vqmovn_s32(tmp32i.val[0]);
+                    tmp16.val[1] = vqmovn_s32(tmp32i.val[1]);
+
+                    /* compute next four phases */
+                    tmp_real.val[0] = vmulq_f32(_phase_real, _phase4_real);
+                    tmp_real.val[1] = vmulq_f32(_phase_imag, _phase4_imag);
+                    tmp_imag.val[0] = vmulq_f32(_phase_real, _phase4_imag);
+                    tmp_imag.val[1] = vmulq_f32(_phase_imag, _phase4_real);
+
+                    _phase_real = vsubq_f32(tmp_real.val[0], tmp_real.val[1]);
+                    _phase_imag = vaddq_f32(tmp_imag.val[0], tmp_imag.val[1]);
+
+                    /* store the four complex results */
+                    vst2_s16((int16_t*)_out, tmp16);
+                    _out += 4;
+                    // Regenerate phase
+                    if ((i % 512) == 0)
+                        {
+                            //printf("Computed phase:  %f\n", cos(cargf(lv_cmake(_phase_real[0],_phase_imag[0]))));
+                            phase_est = arg_phase0 + (i + 1) * 4 * arg_phase_inc;
+                            //printf("Estimated phase: %f\n\n", cos(phase_est));
+
+                            *phase = lv_cmake(cos(phase_est), sin(phase_est));
+                            phase2 = (lv_32fc_t)(*phase) * phase_inc;
+                            phase3 = phase2 * phase_inc;
+                            phase4 = phase3 * phase_inc;
+
+                            __VOLK_ATTR_ALIGNED(16)
+                            float32_t ____phase_real[4] = {lv_creal((*phase)), lv_creal(phase2), lv_creal(phase3), lv_creal(phase4)};
+                            __VOLK_ATTR_ALIGNED(16)
+                            float32_t ____phase_imag[4] = {lv_cimag((*phase)), lv_cimag(phase2), lv_cimag(phase3), lv_cimag(phase4)};
+
+                            _phase_real = vld1q_f32(____phase_real);
+                            _phase_imag = vld1q_f32(____phase_imag);
+                        }
+                }
+            vst1q_f32((float32_t*)__phase_real, _phase_real);
+            vst1q_f32((float32_t*)__phase_imag, _phase_imag);
+
+            (*phase) = lv_cmake((float32_t)__phase_real[0], (float32_t)__phase_imag[0]);
+        }
+    for (i = 0; i < neon_iters % 4; ++i)
+        {
+            tmp16_ = *_in++;
+            tmp32_ = lv_cmake((float32_t)lv_creal(tmp16_), (float32_t)lv_cimag(tmp16_)) * (*phase);
+            *_out++ = lv_cmake((int16_t)rintf(lv_creal(tmp32_)), (int16_t)rintf(lv_cimag(tmp32_)));
+            (*phase) *= phase_inc;
+        }
+}
+
+#endif /* LV_HAVE_NEON64 */
+
+
+#ifdef LV_HAVE_NEON64
+#include <arm_neon.h>
+
+static inline void volk_gnsssdr_16ic_s32fc_x2_rotator_16ic_neon64_reload(lv_16sc_t* outVector, const lv_16sc_t* inVector, const lv_32fc_t phase_inc, lv_32fc_t* phase, unsigned int num_points)
+{
+    unsigned int i = 0;
+    const unsigned int neon_iters = num_points / 4;
+    const unsigned int ROTATOR_RELOAD = 512;
+    unsigned int n;
+    unsigned int j;
+
+    lv_16sc_t tmp16_;
+    lv_32fc_t tmp32_;
+
+    float arg_phase0 = cargf(*phase);
+    float arg_phase_inc = cargf(phase_inc);
+    float phase_est = 0.0;
+
+    const lv_16sc_t* _in = inVector;
+    lv_16sc_t* _out = outVector;
+
+    lv_32fc_t ___phase4 = phase_inc * phase_inc * phase_inc * phase_inc;
+    __VOLK_ATTR_ALIGNED(16)
+    float32_t __phase4_real[4] = {lv_creal(___phase4), lv_creal(___phase4), lv_creal(___phase4), lv_creal(___phase4)};
+    __VOLK_ATTR_ALIGNED(16)
+    float32_t __phase4_imag[4] = {lv_cimag(___phase4), lv_cimag(___phase4), lv_cimag(___phase4), lv_cimag(___phase4)};
+
+    float32x4_t _phase4_real = vld1q_f32(__phase4_real);
+    float32x4_t _phase4_imag = vld1q_f32(__phase4_imag);
+
+    lv_32fc_t phase2 = (lv_32fc_t)(*phase) * phase_inc;
+    lv_32fc_t phase3 = phase2 * phase_inc;
+    lv_32fc_t phase4 = phase3 * phase_inc;
+
+    __VOLK_ATTR_ALIGNED(16)
+    float32_t __phase_real[4] = {lv_creal((*phase)), lv_creal(phase2), lv_creal(phase3), lv_creal(phase4)};
+    __VOLK_ATTR_ALIGNED(16)
+    float32_t __phase_imag[4] = {lv_cimag((*phase)), lv_cimag(phase2), lv_cimag(phase3), lv_cimag(phase4)};
+
+    float32x4_t _phase_real = vld1q_f32(__phase_real);
+    float32x4_t _phase_imag = vld1q_f32(__phase_imag);
+
+    float32x4_t half = vdupq_n_f32(0.5f);
+    int16x4x2_t tmp16;
+    int32x4x2_t tmp32i;
+    float32x4x2_t tmp32f, tmp_real, tmp_imag;
+    float32x4_t sign, PlusHalf, Round;
+
+    if (neon_iters > 0)
+        {
+            for (n = 0; n < neon_iters / ROTATOR_RELOAD; n++)
+                {
+                    for (j = 0; j < ROTATOR_RELOAD; j++)
+                        {
+                            /* load 4 complex numbers (int 16 bits each component) */
+                            tmp16 = vld2_s16((int16_t*)_in);
+                            __VOLK_GNSSSDR_PREFETCH(_in + 8);
+                            _in += 4;
+
+                            /* promote them to int 32 bits */
+                            tmp32i.val[0] = vmovl_s16(tmp16.val[0]);
+                            tmp32i.val[1] = vmovl_s16(tmp16.val[1]);
+
+                            /* promote them to float 32 bits */
+                            tmp32f.val[0] = vcvtq_f32_s32(tmp32i.val[0]);
+                            tmp32f.val[1] = vcvtq_f32_s32(tmp32i.val[1]);
+
+                            /* complex multiplication of four complex samples (float 32 bits each component) */
+                            tmp_real.val[0] = vmulq_f32(tmp32f.val[0], _phase_real);
+                            tmp_real.val[1] = vmulq_f32(tmp32f.val[1], _phase_imag);
+                            tmp_imag.val[0] = vmulq_f32(tmp32f.val[0], _phase_imag);
+                            tmp_imag.val[1] = vmulq_f32(tmp32f.val[1], _phase_real);
+
+                            tmp32f.val[0] = vsubq_f32(tmp_real.val[0], tmp_real.val[1]);
+                            tmp32f.val[1] = vaddq_f32(tmp_imag.val[0], tmp_imag.val[1]);
+
+                            /* downcast results to int32 */
+                            /* in __aarch64__ we can do that with vcvtaq_s32_f32(ret1); vcvtaq_s32_f32(ret2); */
+                            sign = vcvtq_f32_u32((vshrq_n_u32(vreinterpretq_u32_f32(tmp32f.val[0]), 31)));
+                            PlusHalf = vaddq_f32(tmp32f.val[0], half);
+                            Round = vsubq_f32(PlusHalf, sign);
+                            tmp32i.val[0] = vcvtq_s32_f32(Round);
+
+                            sign = vcvtq_f32_u32((vshrq_n_u32(vreinterpretq_u32_f32(tmp32f.val[1]), 31)));
+                            PlusHalf = vaddq_f32(tmp32f.val[1], half);
+                            Round = vsubq_f32(PlusHalf, sign);
+                            tmp32i.val[1] = vcvtq_s32_f32(Round);
+
+                            /* downcast results to int16 */
+                            tmp16.val[0] = vqmovn_s32(tmp32i.val[0]);
+                            tmp16.val[1] = vqmovn_s32(tmp32i.val[1]);
+
+                            /* compute next four phases */
+                            tmp_real.val[0] = vmulq_f32(_phase_real, _phase4_real);
+                            tmp_real.val[1] = vmulq_f32(_phase_imag, _phase4_imag);
+                            tmp_imag.val[0] = vmulq_f32(_phase_real, _phase4_imag);
+                            tmp_imag.val[1] = vmulq_f32(_phase_imag, _phase4_real);
+
+                            _phase_real = vsubq_f32(tmp_real.val[0], tmp_real.val[1]);
+                            _phase_imag = vaddq_f32(tmp_imag.val[0], tmp_imag.val[1]);
+
+                            /* store the four complex results */
+                            vst2_s16((int16_t*)_out, tmp16);
+                            _out += 4;
+                        }
+                    // Regenerate phase
+                    //printf("Computed phase:  %f\n", cos(cargf(lv_cmake(_phase_real[0],_phase_imag[0]))));
+                    phase_est = arg_phase0 + (n + 1) * ROTATOR_RELOAD * 4 * arg_phase_inc;
+                    //printf("Estimated phase: %f\n\n", cos(phase_est));
+                    *phase = lv_cmake(cos(phase_est), sin(phase_est));
+                    phase2 = (lv_32fc_t)(*phase) * phase_inc;
+                    phase3 = phase2 * phase_inc;
+                    phase4 = phase3 * phase_inc;
+
+                    __VOLK_ATTR_ALIGNED(16)
+                    float32_t ____phase_real[4] = {lv_creal((*phase)), lv_creal(phase2), lv_creal(phase3), lv_creal(phase4)};
+                    __VOLK_ATTR_ALIGNED(16)
+                    float32_t ____phase_imag[4] = {lv_cimag((*phase)), lv_cimag(phase2), lv_cimag(phase3), lv_cimag(phase4)};
+
+                    _phase_real = vld1q_f32(____phase_real);
+                    _phase_imag = vld1q_f32(____phase_imag);
+                }
+
+            for (j = 0; j < neon_iters % ROTATOR_RELOAD; j++)
+                {
+                    /* load 4 complex numbers (int 16 bits each component) */
+                    tmp16 = vld2_s16((int16_t*)_in);
+                    __VOLK_GNSSSDR_PREFETCH(_in + 8);
+                    _in += 4;
+
+                    /* promote them to int 32 bits */
+                    tmp32i.val[0] = vmovl_s16(tmp16.val[0]);
+                    tmp32i.val[1] = vmovl_s16(tmp16.val[1]);
+
+                    /* promote them to float 32 bits */
+                    tmp32f.val[0] = vcvtq_f32_s32(tmp32i.val[0]);
+                    tmp32f.val[1] = vcvtq_f32_s32(tmp32i.val[1]);
+
+                    /* complex multiplication of four complex samples (float 32 bits each component) */
+                    tmp_real.val[0] = vmulq_f32(tmp32f.val[0], _phase_real);
+                    tmp_real.val[1] = vmulq_f32(tmp32f.val[1], _phase_imag);
+                    tmp_imag.val[0] = vmulq_f32(tmp32f.val[0], _phase_imag);
+                    tmp_imag.val[1] = vmulq_f32(tmp32f.val[1], _phase_real);
+
+                    tmp32f.val[0] = vsubq_f32(tmp_real.val[0], tmp_real.val[1]);
+                    tmp32f.val[1] = vaddq_f32(tmp_imag.val[0], tmp_imag.val[1]);
+
+                    /* downcast results to int32 */
+                    /* in __aarch64__ we can do that with vcvtaq_s32_f32(ret1); vcvtaq_s32_f32(ret2); */
+                    sign = vcvtq_f32_u32((vshrq_n_u32(vreinterpretq_u32_f32(tmp32f.val[0]), 31)));
+                    PlusHalf = vaddq_f32(tmp32f.val[0], half);
+                    Round = vsubq_f32(PlusHalf, sign);
+                    tmp32i.val[0] = vcvtq_s32_f32(Round);
+
+                    sign = vcvtq_f32_u32((vshrq_n_u32(vreinterpretq_u32_f32(tmp32f.val[1]), 31)));
+                    PlusHalf = vaddq_f32(tmp32f.val[1], half);
+                    Round = vsubq_f32(PlusHalf, sign);
+                    tmp32i.val[1] = vcvtq_s32_f32(Round);
+
+                    /* downcast results to int16 */
+                    tmp16.val[0] = vqmovn_s32(tmp32i.val[0]);
+                    tmp16.val[1] = vqmovn_s32(tmp32i.val[1]);
+
+                    /* compute next four phases */
+                    tmp_real.val[0] = vmulq_f32(_phase_real, _phase4_real);
+                    tmp_real.val[1] = vmulq_f32(_phase_imag, _phase4_imag);
+                    tmp_imag.val[0] = vmulq_f32(_phase_real, _phase4_imag);
+                    tmp_imag.val[1] = vmulq_f32(_phase_imag, _phase4_real);
+
+                    _phase_real = vsubq_f32(tmp_real.val[0], tmp_real.val[1]);
+                    _phase_imag = vaddq_f32(tmp_imag.val[0], tmp_imag.val[1]);
+
+                    /* store the four complex results */
+                    vst2_s16((int16_t*)_out, tmp16);
+                    _out += 4;
+                }
+
+            vst1q_f32((float32_t*)__phase_real, _phase_real);
+            vst1q_f32((float32_t*)__phase_imag, _phase_imag);
+
+            (*phase) = lv_cmake((float32_t)__phase_real[0], (float32_t)__phase_imag[0]);
+        }
+    for (i = 0; i < neon_iters % 4; ++i)
+        {
+            tmp16_ = *_in++;
+            tmp32_ = lv_cmake((float32_t)lv_creal(tmp16_), (float32_t)lv_cimag(tmp16_)) * (*phase);
+            *_out++ = lv_cmake((int16_t)rintf(lv_creal(tmp32_)), (int16_t)rintf(lv_cimag(tmp32_)));
+            (*phase) *= phase_inc;
+        }
+}
+
+#endif /* LV_HAVE_NEON64 */
+
 #endif /* INCLUDED_volk_gnsssdr_16ic_s32fc_x2_rotator_16ic_H */

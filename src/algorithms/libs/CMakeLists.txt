@@ -71,6 +71,16 @@ if(OPENCL_FOUND)
     endif(OS_IS_MACOSX)
 endif(OPENCL_FOUND)
 
+if(ENABLE_CUDA)
+    list(APPEND CUDA_NVCC_FLAGS "-gencode arch=compute_62,code=sm_62; -std=c++11;-O3; -use_fast_math -default-stream per-thread")
+    set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+    cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cuda)
+    set(LIB_TYPE STATIC)
+    cuda_add_library(cuda_kernels_lib ${LIB_TYPE} cuda/cuda_kernels.h cuda/cuda_kernels.cu)
+    set(OPT_LIBRARIES ${OPT_LIBRARIES} cuda_kernels_lib)
+    set(OPT_ACQ_GR_BLOCK_INCLUDES ${OPT_ACQ_GR_BLOCK_INCLUDES} ${CUDA_INCLUDE_DIRS})
+endif(ENABLE_CUDA)
+
 add_definitions(-DGNSSSDR_INSTALL_DIR="${CMAKE_INSTALL_PREFIX}")
 
 file(GLOB GNSS_SPLIBS_HEADERS "*.h")

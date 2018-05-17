@@ -8,7 +8,11 @@
 <archs>generic neon softfp|hardfp orc|</archs>
 </machine>
 
-<!-- trailing | bar means generate without either for MSVC -->
+<machine name="neon64">
+    <archs>generic neon64 orc|</archs>
+</machine>
+
+    <!-- trailing | bar means generate without either for MSVC -->
 <machine name="sse2">
 <archs>generic 32|64| mmx| sse sse2 orc|</archs>
 </machine>

@@ -53,9 +53,9 @@
 
 #include "gnss_synchro.h"
 #include <armadillo>
+#include <volk/volk.h>
 #include <gnuradio/block.h>
 #include <gnuradio/fft/fft.h>
-#include <volk_gnsssdr/volk_gnsssdr.h>
 #include <string>
 #include <cufft.h>
 
@@ -112,7 +112,7 @@ private:
 
     void send_positive_acquisition();
 
-    int init_cuda();
+    int init_cu();
 
     pcps_cuda_conf_t acq_parameters;
     bool d_active;

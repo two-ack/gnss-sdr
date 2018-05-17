@@ -51,6 +51,7 @@
 #include "pcps_cuda_acquisition.h"
 #include "GPS_L1_CA.h"         // for GPS_TWO_PI
 #include "GLONASS_L1_L2_CA.h"  // for GLONASS_TWO_PI"
+#include "cuda/cuda_kernels.h"
 #include <glog/logging.h>
 #include <gnuradio/io_signature.h>
 #include <matio.h>
@@ -60,159 +61,6 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cufft.h>
-
-#define gpuErrchk(ans) gpuAssert((ans), __FILE__, __LINE__)
-inline int gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-    if (code != cudaSuccess)
-    {
-        fprintf(stderr, "CUDA Error: %s(%d) %s %d\n", cudaGetErrorString(code), code, file, line);
-        DLOG(ERROR) << "CUDA Error: " << cudaGetErrorString(code) << "(" << code << ")" << " " << file << " " << line;
-        if (abort) exit(code);
-    }
-    return code;
-}
-
-#define cufftErrchk(ans) cufftAssert((ans), __FILE__, __LINE__)
-inline int cufftAssert(cufftResult code, const char *file, int line, bool abort=true)
-{
-    if (code != CUFFT_SUCCESS)
-    {
-        fprintf(stderr, "CUFFT Error: code: %d %s %d\n", code, file, line);
-        DLOG(ERROR) << "CUFFT Error: code: " << code << " " << file << " " << line;
-        if (abort) exit(code);
-    }
-    return code;
-}
-
-__global__ void cuda_conj_vector(cuComplex* out, cuComplex* in, unsigned int size) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-    for (int i = index; i < size; i += stride) {
-        out[i] = cuConjf(in[i]);
-    }
-}
-
-__global__ void cuda_sincos(cuComplex* out, float phase_inc, float phase, unsigned int size) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-    for (int i = index; i < size; i += stride) {
-        out[i] = make_cuComplex(cos(phase + i * phase_inc), sin(phase + i * phase_inc));
-    }
-}
-
-__global__ void cuda_mul_vectors(cuComplex* out, cuComplex* in1, cuComplex* in2, unsigned int size) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-    for (int i = index; i < size; i += stride) {
-        out[i] = cuCmulf(in1[i], in2[i]);
-    }
-}
-
-typedef struct {
-    int16_t r;
-    int16_t i;
-} int16c_t;
-
-__global__ void cuda_convert_cshort(cuComplex* out, lv_16sc_t* in, unsigned int size) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-    for (int i = index; i < size; i += stride) {
-        int16c_t* iin = (int16c_t *)in;
-        out[i] = make_cuComplex(iin[i].r, iin[i].i);
-    }
-}
-
-__global__ void cuda_max_magt_sq_and_index_stage1(float* magt, int* magt_idx, cuComplex* in, unsigned int size) {
-    extern __shared__ float shared[];
-    float* max_num = shared;
-    int* max_idx = (int*)&max_num[blockDim.x];
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-    int tid = threadIdx.x;
-    float magt_sq = 0;
-    max_num[tid] = FLT_MIN;
-
-    for(int i = index; i < size; i += stride) {
-        magt_sq = cuCrealf(in[i]) * cuCrealf(in[i]) + cuCimagf(in[i]) * cuCimagf(in[i]);
-        if(max_num[tid] < magt_sq) {
-            max_num[tid] = magt_sq;
-            max_idx[tid] = i;
-        }
-    }
-    __syncthreads();
-
-    for(int s = blockDim.x >> 1; s > 0; s >>= 1) {
-        if(tid < s && index < size) {
-            if(max_num[tid] < max_num[tid + s]) {
-                max_num[tid] = max_num[tid + s];
-                max_idx[tid] = max_idx[tid + s];
-            } else if(max_num[tid] == max_num[tid + s]) {
-                max_idx[tid] = min(max_idx[tid], max_idx[tid + s]);
-            }
-        }
-        __syncthreads();
-    }
-    if(tid == 0) {
-        magt[blockIdx.x] = max_num[0];
-        magt_idx[blockIdx.x] = max_idx[0];
-    }
-}
-
-__global__ void cuda_max_magt_sq_and_index_stage2(float* magt, int* magt_idx, unsigned int size) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int tid = threadIdx.x;
-
-    for(int s = blockDim.x >> 1; s > 0; s >>= 1) {
-        if(tid < s && index < size) {
-            if(magt[tid] < magt[tid + s]) {
-                magt[tid] = magt[tid + s];
-                magt_idx[tid] = magt_idx[tid + s];
-            } else if(magt[tid] == magt[tid + s]) {
-                magt_idx[tid] = min(magt_idx[tid], magt_idx[tid + s]);
-            }
-        }
-        __syncthreads();
-    }
-}
-
-__global__ void cuda_magt_sq_sum_stage1(float* sum, cuComplex* in, unsigned int size) {
-    extern __shared__ float shared[];
-    float* num = shared;
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-    int tid = threadIdx.x;
-    float magt_sq = 0;
-    num[tid] = 0;
-
-    for(int i = index; i < size; i += stride) {
-        magt_sq = cuCrealf(in[i]) * cuCrealf(in[i]) + cuCimagf(in[i]) * cuCimagf(in[i]);
-        num[tid] += magt_sq;
-    }
-    __syncthreads();
-
-    for(int s = blockDim.x >> 1; s > 0; s >>= 1) {
-        if(tid < s && index < size) {
-            num[tid] += num[tid + s];
-        }
-        __syncthreads();
-    }
-    if(tid == 0) {
-        sum[blockIdx.x] = num[0];
-    }
-}
-
-__global__ void cuda_magt_sq_sum_stage2(float* sum, unsigned int size) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int tid = threadIdx.x;
-
-    for(int s = blockDim.x >> 1; s > 0; s >>= 1) {
-        if(tid < s && index < size) {
-            sum[tid] += sum[tid + s];
-        }
-        __syncthreads();
-    }
-}
 
 void print_buff(cuComplex* buff, unsigned int size, const char* msg) {
     gr_complex* tmp = (gr_complex*)malloc(sizeof(gr_complex) * size);
@@ -409,7 +257,7 @@ void pcps_cuda_acquisition::init()
     d_num_doppler_bins = static_cast<unsigned int>(std::ceil(static_cast<double>(static_cast<int>(acq_parameters.doppler_max) - static_cast<int>(-acq_parameters.doppler_max)) / static_cast<double>(d_doppler_step)));
 
 
-    int err = init_cuda();
+    int err = init_cu();
     if(err != 0) {
         DLOG(ERROR) << "Unable to initialize cuda";
         exit(err);
@@ -422,57 +270,18 @@ void pcps_cuda_acquisition::init()
     }
 }
 
-int pcps_cuda_acquisition::init_cuda()
+int pcps_cuda_acquisition::init_cu()
 {
-    cudaDeviceProp  prop;
-    int num_devices, device;
+    selected_device = init_cuda();
+    if(selected_device == -1) {
+        return -1;
+    }
+
     cu_num_threads = 1024;
     cu_num_blocks = d_fft_size_pow2 / cu_num_threads;
     cu_magt_blocks = cu_num_blocks;
-    gpuErrchk(cudaGetDeviceCount(&num_devices));
-    printf("NUM OF DEVICES %i\n", num_devices);
-    if (num_devices > 1) {
-        int max_multiprocessors = 0, max_device = 0;
-        for (device = 0; device < num_devices; device++) {
-            cudaDeviceProp properties;
-            cudaGetDeviceProperties(&properties, device);
-            if (max_multiprocessors < properties.multiProcessorCount) {
-                max_multiprocessors = properties.multiProcessorCount;
-                max_device = device;
-            }
-            printf("Found GPU device # %i\n",device);
-        }
 
-        //set random device!
-        selected_device=rand() % num_devices;//generates a random number between 0 and num_devices to split the threads between GPUs
-        gpuErrchk(cudaSetDevice(selected_device));
-
-        gpuErrchk(cudaGetDeviceProperties(&prop, max_device));
-        //debug code
-        if (prop.canMapHostMemory != 1) {
-            printf( "Device can not map memory.\n" );
-        }
-        printf("L2 Cache size= %u \n",prop.l2CacheSize);
-        printf("maxThreadsPerBlock= %u \n",prop.maxThreadsPerBlock);
-        printf("maxGridSize= %i \n",prop.maxGridSize[0]);
-        printf("sharedMemPerBlock= %lu \n",prop.sharedMemPerBlock);
-        printf("deviceOverlap= %i \n",prop.deviceOverlap);
-        printf("multiProcessorCount= %i \n",prop.multiProcessorCount);
-    }else{
-        gpuErrchk(cudaGetDevice(&selected_device));
-        gpuErrchk(cudaGetDeviceProperties( &prop, selected_device ));
-        //debug code
-        if (prop.canMapHostMemory != 1) {
-            printf( "Device can not map memory.\n" );
-        }
-
-        printf("L2 Cache size= %u \n",prop.l2CacheSize);
-        printf("maxThreadsPerBlock= %u \n",prop.maxThreadsPerBlock);
-        printf("maxGridSize= %i \n",prop.maxGridSize[0]);
-        printf("sharedMemPerBlock= %lu \n",prop.sharedMemPerBlock);
-        printf("deviceOverlap= %i \n",prop.deviceOverlap);
-        printf("multiProcessorCount= %i \n",prop.multiProcessorCount);
-    }
+    gpuErrchk(cudaSetDevice(selected_device));
 
     cufftErrchk(cufftPlan1d(&cu_fft_plan, d_fft_size, CUFFT_C2C, 1));
 

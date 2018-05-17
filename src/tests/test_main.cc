@@ -130,6 +130,8 @@ DECLARE_string(log_dir);
 
 #if CUDA_BLOCKS_TEST
 #include "unit-tests/signal-processing-blocks/tracking/gpu_multicorrelator_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/cuda_multicorrelator_real_codes_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/gps_l1_ca_dll_pll_tracking_cuda_test.cc"
 #include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_cuda_acquisition_test.cc"
 #endif
 
