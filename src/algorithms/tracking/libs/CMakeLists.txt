@@ -58,6 +58,7 @@ if(ENABLE_CUDA)
     )
     set(LIB_TYPE STATIC) #set the lib type
     CUDA_ADD_LIBRARY(CUDA_CORRELATOR_LIB ${LIB_TYPE} cuda_multicorrelator.h cuda_multicorrelator.cu cuda_multicorrelator_real_codes.h cuda_multicorrelator_real_codes.cu)
+    cuda_add_cublas_to_target(CUDA_CORRELATOR_LIB)
     add_dependencies(CUDA_CORRELATOR_LIB cuda_kernels_lib)
     target_link_libraries(CUDA_CORRELATOR_LIB cuda_kernels_lib)
     set(OPT_TRACKING_LIBRARIES ${OPT_TRACKING_LIBRARIES} CUDA_CORRELATOR_LIB)

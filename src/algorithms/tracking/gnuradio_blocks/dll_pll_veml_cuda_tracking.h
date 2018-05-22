@@ -91,7 +91,7 @@ private:
 
     bool cn0_and_tracking_lock_status();
     bool acquire_secondary();
-    void do_correlation_step(cuComplex *input_samples);
+    void do_correlation_step(const gr_complex *input_samples);
     void run_dll_pll();
     void update_tracking_vars();
     void clear_tracking_vars();

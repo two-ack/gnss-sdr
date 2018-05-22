@@ -5,21 +5,9 @@ int init_cuda() {
     int selected_device = -1;
     cudaDeviceProp prop;
     int num_devices;
-//    int device;
     gpuErrchk(cudaGetDeviceCount(&num_devices));
     printf("NUM OF DEVICES %i\n", num_devices);
     if (num_devices > 0) {
-//        int max_multiprocessors = 0, max_device = 0;
-//        for (device = 0; device < num_devices; device++) {
-//            cudaDeviceProp properties;
-//            cudaGetDeviceProperties(&properties, device);
-//            if (max_multiprocessors < properties.multiProcessorCount) {
-//                max_multiprocessors = properties.multiProcessorCount;
-//                max_device = device;
-//            }
-//            printf("Found GPU device # %i\n", device);
-//        }
-//
         //set random device!
         //generates a random number between 0 and num_devices to split the threads between GPUs
         selected_device = rand() % num_devices;
@@ -167,7 +155,7 @@ __global__ void cuda_magt_sq_sum_stage2(float* sum, unsigned int size) {
     }
 }
 
-__global__ void cuda_xn_resampler_xn(float* result, const float* local_code,
+__global__ void cuda_xn_resampler_xn(cuComplex* result, const float* local_code,
                                      float rem_code_phase_chips, float code_phase_step_chips,
                                      float* shifts_chips, unsigned int code_length_chips, int num_out_vectors,
                                      unsigned int num_points) {
@@ -183,7 +171,7 @@ __global__ void cuda_xn_resampler_xn(float* result, const float* local_code,
             //Take into account that in multitap correlators, the shifts can be negative!
             if (local_code_chip_index < 0) local_code_chip_index += (int)code_length_chips * (abs(local_code_chip_index) / code_length_chips + 1);
             local_code_chip_index = local_code_chip_index % code_length_chips;
-            result[current_correlator_tap * num_points + n] = local_code[local_code_chip_index];
+            result[current_correlator_tap * num_points + n] = make_cuComplex(local_code[local_code_chip_index], 0);
         }
     }
 }
@@ -196,12 +184,6 @@ __global__ void cuda_x2_dot_prod_xn_stage1(cuComplex* result, const cuComplex* i
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
     int tid = threadIdx.x;
-//    printf("res ptr %p; in common %p; phase %p; in_a %p; num: %p\n",
-//           result,
-//           in_common,
-//           phase,
-//           in_a,
-//           num);
 
     for(int n_vec = 0; n_vec < num_a_vectors; n_vec++) {
         num[n_vec * blockDim.x + tid] = make_cuComplex(0, 0);

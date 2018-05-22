@@ -119,14 +119,14 @@ TEST(CUDAMulticorrelatorRealCodesTest, MeasureExecutionTime)
         exit(0);
     }
     cuComplex *cu_in;
-    gpuErrchk(cudaMalloc((void**)&cu_in, sizeof(cuComplex) * 2 * d_vector_length));
-    gpuErrchk(cudaMemcpy(cu_in, in_cuda, sizeof(cuComplex) * 2 * d_vector_length, cudaMemcpyHostToDevice));
+//    gpuErrchk(cudaMalloc((void**)&cu_in, sizeof(cuComplex) * 2 * d_vector_length));
+//    gpuErrchk(cudaMemcpy(cu_in, in_cuda, sizeof(cuComplex) * 2 * d_vector_length, cudaMemcpyHostToDevice));
 
     for (int n = 0; n < max_threads; n++)
     {
         correlator_pool[n] = new cuda_multicorrelator_real_codes();
         correlator_pool[n]->init(device, d_vector_length, static_cast<int>(GPS_L1_CA_CODE_LENGTH_CHIPS), d_n_correlator_taps);
-        correlator_pool[n]->set_input_output_vectors(d_correlator_outs, cu_in);
+        correlator_pool[n]->set_input_output_vectors(d_correlator_outs, in_cuda);
         correlator_pool[n]->set_local_code_and_taps(static_cast<int>(GPS_L1_CA_CODE_LENGTH_CHIPS), d_ca_code, d_local_code_shift_chips, d_n_correlator_taps);
     }
 

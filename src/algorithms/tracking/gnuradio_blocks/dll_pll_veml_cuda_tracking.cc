@@ -86,7 +86,7 @@ dll_pll_veml_cuda_tracking::dll_pll_veml_cuda_tracking(dllpllconf_cuda_t conf_) 
     if(cu_selected_device == -1) {
         exit(0);
     }
-    gpuErrchk(cudaMalloc((void**)&cu_in, sizeof(cuComplex) * 2 * trk_parameters.vector_length));
+//    gpuErrchk(cudaMalloc((void**)&cu_in, sizeof(cuComplex) * 2 * trk_parameters.vector_length));
     // Telemetry bit synchronization message port input
     this->message_port_register_out(pmt::mp("events"));
     this->set_relative_rate(1.0 / static_cast<double>(trk_parameters.vector_length));
@@ -565,7 +565,7 @@ dll_pll_veml_cuda_tracking::~dll_pll_veml_cuda_tracking()
         volk_gnsssdr_free(d_local_code_shift_chips);
         volk_gnsssdr_free(d_correlator_outs);
         volk_gnsssdr_free(d_tracking_code);
-        gpuErrchk(cudaFree(cu_in));
+//        gpuErrchk(cudaFree(cu_in));
         if (trk_parameters.track_pilot)
         {
             volk_gnsssdr_free(d_Prompt_Data);
@@ -670,7 +670,7 @@ bool dll_pll_veml_cuda_tracking::cn0_and_tracking_lock_status()
 // - updated remnant code phase in samples (d_rem_code_phase_samples)
 // - d_code_freq_chips
 // - d_carrier_doppler_hz
-void dll_pll_veml_cuda_tracking::do_correlation_step(cuComplex *input_samples)
+void dll_pll_veml_cuda_tracking::do_correlation_step(const gr_complex *input_samples)
 {
     // ################# CARRIER WIPEOFF AND CORRELATORS ##############################
     // perform carrier wipe-off and compute Early, Prompt and Late correlation
@@ -1239,7 +1239,7 @@ int dll_pll_veml_cuda_tracking::general_work(int noutput_items __attribute__((un
         }
         case 2:  // Wide tracking and symbol synchronization
         {
-            do_correlation_step(cu_in);
+            do_correlation_step(in);
             // Save single correlation step variables
             if (d_veml)
             {
@@ -1371,7 +1371,7 @@ int dll_pll_veml_cuda_tracking::general_work(int noutput_items __attribute__((un
             // Fill the acquisition data
             current_synchro_data = *d_acquisition_gnss_synchro;
             // perform a correlation step
-            do_correlation_step(cu_in);
+            do_correlation_step(in);
             update_tracking_vars();
             save_correlation_results();
 
@@ -1425,7 +1425,7 @@ int dll_pll_veml_cuda_tracking::general_work(int noutput_items __attribute__((un
             current_synchro_data = *d_acquisition_gnss_synchro;
 
             // perform a correlation step
-            do_correlation_step(cu_in);
+            do_correlation_step(in);
             save_correlation_results();
 
             // check lock status
