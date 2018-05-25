@@ -118,7 +118,7 @@ TEST(CUDAMulticorrelatorRealCodesTest, MeasureExecutionTime)
     if(device == -1) {
         exit(0);
     }
-    cuComplex *cu_in;
+//    cuComplex *cu_in;
 //    gpuErrchk(cudaMalloc((void**)&cu_in, sizeof(cuComplex) * 2 * d_vector_length));
 //    gpuErrchk(cudaMemcpy(cu_in, in_cuda, sizeof(cuComplex) * 2 * d_vector_length, cudaMemcpyHostToDevice));
 

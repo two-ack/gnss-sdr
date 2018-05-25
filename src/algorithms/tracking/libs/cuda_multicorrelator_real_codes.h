@@ -72,6 +72,8 @@ private:
     int d_n_correlators;
     int cu_num_blocks;
     int cu_num_threads;
+    int cu_mul_num_blocks;
+    int cu_mul_num_threads;
 
     cublasHandle_t cublas_handle;
 };

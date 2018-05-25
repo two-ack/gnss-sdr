@@ -1441,6 +1441,12 @@ if(ENABLE_GPERFTOOLS)
 endif(ENABLE_GPERFTOOLS)
 
 
+if(ENABLE_NVIDIA_SYSTEM_PROFILER)
+    set(MY_CXX_FLAGS "${MY_CXX_FLAGS} -g")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fno-omit-frame-pointer -funwind-tables -g")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fno-omit-frame-pointer -funwind-tables -g")
+endif(ENABLE_NVIDIA_SYSTEM_PROFILER)
+
 
 ########################################################################
 # GNU gprof (OPTIONAL) - https://sourceware.org/binutils/docs/gprof/

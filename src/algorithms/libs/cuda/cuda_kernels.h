@@ -75,10 +75,24 @@ __global__ void cuda_xn_resampler_xn(cuComplex* result, const float* local_code,
                                      unsigned int num_points);
 
 __global__ void cuda_x2_dot_prod_xn_stage1(cuComplex* result, const cuComplex* in_common,
-                                           cuComplex* phase, float* in_a, int num_a_vectors,
+                                           cuComplex* phase, cuComplex* in_a, int num_a_vectors,
                                            unsigned int num_points);
 
 __global__ void cuda_x2_dot_prod_xn_stage2(cuComplex* end_result, cuComplex* result, int num_a_vectors,
                                            unsigned int num_points);
+
+__global__ void cuda_multicorrelator_stage1(cuComplex* result,
+                                            float phase_inc,
+                                            float phase,
+                                            const float* local_code,
+                                            float rem_code_phase_chips,
+                                            float code_phase_step_chips,
+                                            float* shifts_chips,
+                                            unsigned int code_length_chips,
+                                            const cuComplex* in_common,
+                                            int num_out_vectors,
+                                            unsigned int num_points);
+
+__global__ void cuda_multicorrelator_stage2(cuComplex* end_result, cuComplex* result);
 
 #endif //__CUDA_KERNELS_H__

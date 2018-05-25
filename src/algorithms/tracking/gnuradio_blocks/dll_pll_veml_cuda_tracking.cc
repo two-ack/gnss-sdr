@@ -255,7 +255,8 @@ dll_pll_veml_cuda_tracking::dll_pll_veml_cuda_tracking(dllpllconf_cuda_t conf_) 
 
     // Initialization of local code replica
     // Get space for a vector with the sinboc(1,1) replica sampled 2x/chip
-    d_tracking_code = static_cast<float *>(volk_gnsssdr_malloc(2 * d_code_length_chips * sizeof(float), volk_gnsssdr_get_alignment()));
+//    d_tracking_code = static_cast<float *>(volk_gnsssdr_malloc(2 * d_code_length_chips * sizeof(float), volk_gnsssdr_get_alignment()));
+    gpuErrchk(cudaMallocHost((void **)&d_tracking_code, 2 * d_code_length_chips * sizeof(float)));
     // correlator outputs (scalar)
     if (d_veml)
     {
@@ -268,8 +269,10 @@ dll_pll_veml_cuda_tracking::dll_pll_veml_cuda_tracking(dllpllconf_cuda_t conf_) 
         d_n_correlator_taps = 3;
     }
 
-    d_correlator_outs = static_cast<gr_complex *>(volk_gnsssdr_malloc(d_n_correlator_taps * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
-    d_local_code_shift_chips = static_cast<float *>(volk_gnsssdr_malloc(d_n_correlator_taps * sizeof(float), volk_gnsssdr_get_alignment()));
+//    d_correlator_outs = static_cast<gr_complex *>(volk_gnsssdr_malloc(d_n_correlator_taps * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+    gpuErrchk(cudaMallocHost((void **)&d_correlator_outs, d_n_correlator_taps * sizeof(gr_complex)));
+//    d_local_code_shift_chips = static_cast<float *>(volk_gnsssdr_malloc(d_n_correlator_taps * sizeof(float), volk_gnsssdr_get_alignment()));
+    gpuErrchk(cudaMallocHost((void **)&d_local_code_shift_chips, d_n_correlator_taps * sizeof(float)));
     std::fill_n(d_correlator_outs, d_n_correlator_taps, gr_complex(0.0, 0.0));
 
     // map memory pointers of correlator outputs
@@ -317,9 +320,12 @@ dll_pll_veml_cuda_tracking::dll_pll_veml_cuda_tracking(dllpllconf_cuda_t conf_) 
     {
         // Extra correlator for the data component
         correlator_data_cuda.init(cu_selected_device, 2 * trk_parameters.vector_length, d_code_length_chips, 1);
-        d_Prompt_Data = static_cast<gr_complex *>(volk_gnsssdr_malloc(sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+//        d_Prompt_Data = static_cast<gr_complex *>(volk_gnsssdr_malloc(sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+        gpuErrchk(cudaMallocHost((void **)&d_Prompt_Data, sizeof(gr_complex)));
         d_Prompt_Data[0] = gr_complex(0.0, 0.0);
-        d_data_code = static_cast<float *>(volk_gnsssdr_malloc(2 * d_code_length_chips * sizeof(float), volk_gnsssdr_get_alignment()));
+//        d_data_code = static_cast<float *>(volk_gnsssdr_malloc(2 * d_code_length_chips * sizeof(float), volk_gnsssdr_get_alignment()));
+        gpuErrchk(cudaMallocHost((void **)&d_data_code, 2 * d_code_length_chips * sizeof(float)));
+
     }
     else
     {
@@ -439,7 +445,7 @@ void dll_pll_veml_cuda_tracking::start_tracking()
             gps_l5q_code_gen_float(d_tracking_code, d_acquisition_gnss_synchro->PRN);
             gps_l5i_code_gen_float(d_data_code, d_acquisition_gnss_synchro->PRN);
             d_Prompt_Data[0] = gr_complex(0.0, 0.0);
-            correlator_data_cuda.set_local_code_and_taps(d_code_length_chips, d_data_code, d_prompt_data_shift, 0);
+            correlator_data_cuda.set_local_code_and_taps(d_code_length_chips, d_data_code, d_prompt_data_shift, 1);
         }
         else
         {
@@ -455,7 +461,7 @@ void dll_pll_veml_cuda_tracking::start_tracking()
             galileo_e1_code_gen_sinboc11_float(d_data_code, d_acquisition_gnss_synchro->Signal, d_acquisition_gnss_synchro->PRN);
             d_Prompt_Data[0] = gr_complex(0.0, 0.0);
             correlator_data_cuda.set_local_code_and_taps(d_code_samples_per_chip * d_code_length_chips, d_data_code,
-                                                         d_prompt_data_shift, 0);
+                                                         d_prompt_data_shift, 1);
         }
         else
         {
@@ -464,7 +470,10 @@ void dll_pll_veml_cuda_tracking::start_tracking()
     }
     else if (systemName.compare("Galileo") == 0 and signal_type.compare("5X") == 0)
     {
-        gr_complex *aux_code = static_cast<gr_complex *>(volk_gnsssdr_malloc(sizeof(gr_complex) * d_code_length_chips, volk_gnsssdr_get_alignment()));
+//        gr_complex *aux_code = static_cast<gr_complex *>(volk_gnsssdr_malloc(sizeof(gr_complex) * d_code_length_chips, volk_gnsssdr_get_alignment()));
+        gr_complex *aux_code;
+        gpuErrchk(cudaMallocHost((void **)&aux_code, sizeof(gr_complex) * d_code_length_chips));
+
         galileo_e5_a_code_gen_complex_primary(aux_code, d_acquisition_gnss_synchro->PRN, const_cast<char *>(signal_type.c_str()));
         if (trk_parameters.track_pilot)
         {
@@ -475,7 +484,7 @@ void dll_pll_veml_cuda_tracking::start_tracking()
                 d_data_code[i] = aux_code[i].real();
             }
             d_Prompt_Data[0] = gr_complex(0.0, 0.0);
-            correlator_data_cuda.set_local_code_and_taps(d_code_length_chips, d_data_code, d_prompt_data_shift, 0);
+            correlator_data_cuda.set_local_code_and_taps(d_code_length_chips, d_data_code, d_prompt_data_shift, 1);
         }
         else
         {
@@ -484,11 +493,11 @@ void dll_pll_veml_cuda_tracking::start_tracking()
                 d_tracking_code[i] = aux_code[i].real();
             }
         }
-        volk_gnsssdr_free(aux_code);
+        gpuErrchk(cudaFree(aux_code));
     }
 
     multicorrelator_cuda.set_local_code_and_taps(d_code_samples_per_chip * d_code_length_chips, d_tracking_code,
-                                                 d_local_code_shift_chips, 0);
+                                                 d_local_code_shift_chips, d_n_correlator_taps);
     std::fill_n(d_correlator_outs, d_n_correlator_taps, gr_complex(0.0, 0.0));
 
     d_carrier_lock_fail_counter = 0;
@@ -562,14 +571,14 @@ dll_pll_veml_cuda_tracking::~dll_pll_veml_cuda_tracking()
     }
     try
     {
-        volk_gnsssdr_free(d_local_code_shift_chips);
-        volk_gnsssdr_free(d_correlator_outs);
-        volk_gnsssdr_free(d_tracking_code);
+        gpuErrchk(cudaFreeHost(d_local_code_shift_chips));
+        gpuErrchk(cudaFreeHost(d_correlator_outs));
+        gpuErrchk(cudaFreeHost(d_tracking_code));
 //        gpuErrchk(cudaFree(cu_in));
         if (trk_parameters.track_pilot)
         {
-            volk_gnsssdr_free(d_Prompt_Data);
-            volk_gnsssdr_free(d_data_code);
+            gpuErrchk(cudaFreeHost(d_Prompt_Data));
+            gpuErrchk(cudaFreeHost(d_data_code));
             correlator_data_cuda.free();
         }
         delete[] d_Prompt_buffer;

@@ -64,21 +64,23 @@ bool cuda_multicorrelator_real_codes::init(int device, int max_signal_length_sam
 {
     d_n_correlators = n_correlators;
     cu_selected_device = device;
+    int max_signal_length_samples_pow2 = (int)pow(2, ceil(log2((double)max_signal_length_samples)));
     gpuErrchk(cudaSetDevice(cu_selected_device));
-    cublasErrchk(cublasCreate(&cublas_handle));
-    cu_num_threads = 128;
-    cu_num_blocks = (int)pow(2, ceil(log2((double)max_signal_length_samples))) / cu_num_threads;
+    cu_num_threads = 1024;
+    cu_num_blocks = max_signal_length_samples_pow2 / cu_num_threads;
+    cu_mul_num_threads = cu_num_threads;
+    cu_mul_num_blocks = cu_num_blocks;
     // ALLOCATE MEMORY FOR INTERNAL vectors
-    size_t size = max_signal_length_samples * sizeof(cuComplex);
-    gpuErrchk(cudaMalloc((void**)&cu_sig_in, size));
+    size_t size = max_signal_length_samples_pow2 * sizeof(cuComplex);
+    gpuErrchk(cudaHostAlloc((void**)&cu_sig_in, size, cudaHostAllocMapped | cudaHostAllocWriteCombined));
+//    gpuErrchk(cudaMalloc((void**)&cu_sig_in, size));
     gpuErrchk(cudaMalloc((void**)&cu_corr_out, n_correlators * sizeof(cuComplex)));
     gpuErrchk(cudaMalloc((void**)&cu_local_code_in, code_length_chips * sizeof(float)));
     gpuErrchk(cudaMalloc((void**)&cu_shifts_chips, n_correlators * sizeof(float)));
-    gpuErrchk(cudaMalloc((void**)&cu_red_tmp, n_correlators * cu_num_blocks * sizeof(cuComplex)));
+    gpuErrchk(cudaMalloc((void**)&cu_red_tmp, n_correlators * cu_mul_num_blocks * sizeof(cuComplex)));
 //    d_local_codes_resampled = static_cast<std::complex<float>**>(volk_gnsssdr_malloc(n_correlators * sizeof(std::complex<float>*), volk_gnsssdr_get_alignment()));
 
-    gpuErrchk(cudaMalloc((void**)&cu_local_codes_resampled, size * n_correlators));
-    gpuErrchk(cudaMalloc((void**)&cu_phase, size));
+//    gpuErrchk(cudaMalloc((void**)&cu_phase, size));
     return true;
 }
 
@@ -127,23 +129,18 @@ bool cuda_multicorrelator_real_codes::Carrier_wipeoff_multicorrelator_resampler(
         int signal_length_samples)
 {
     gpuErrchk(cudaSetDevice(cu_selected_device));
-//    gpuErrchk(cudaMemcpy(cu_sig_in, d_sig_in, sizeof(cuComplex) * signal_length_samples, cudaMemcpyHostToDevice));
-    update_local_code(signal_length_samples, rem_code_phase_chips, code_phase_step_chips);
-    // Regenerate phase at each call in order to avoid numerical issues
-    cuda_sincos<<<cu_num_blocks, cu_num_threads>>>(cu_phase, -phase_step_rad, -rem_carrier_phase_in_rad, signal_length_samples);
+    int signal_length_samples_pow2 = (int)pow(2, ceil(log2((double)signal_length_samples)));
+    memcpy(cu_sig_in, d_sig_in, sizeof(cuComplex) * signal_length_samples);
+    memset(cu_sig_in + signal_length_samples, 0, signal_length_samples_pow2 - signal_length_samples);
+    cu_mul_num_blocks = signal_length_samples_pow2 / cu_mul_num_threads;
+    cuda_multicorrelator_stage1<<<cu_mul_num_blocks * d_n_correlators, cu_mul_num_threads, cu_mul_num_threads * sizeof(cuComplex)>>>(
+            cu_red_tmp, -phase_step_rad, -rem_carrier_phase_in_rad,
+            cu_local_code_in, rem_code_phase_chips, code_phase_step_chips, cu_shifts_chips, d_code_length_chips,
+            cu_sig_in, d_n_correlators, signal_length_samples_pow2);
     gpuErrchk(cudaGetLastError());
-
-    cuda_mul_vectors<<<cu_num_blocks, cu_num_threads>>>(cu_phase, cu_phase, cu_sig_in, signal_length_samples);
+    cuda_multicorrelator_stage2<<<d_n_correlators, cu_mul_num_blocks>>>(cu_corr_out, cu_red_tmp);
     gpuErrchk(cudaGetLastError());
-
-    cuComplex alpha = make_cuComplex(1, 0);
-    cuComplex beta = make_cuComplex(0, 0);
-    cublasErrchk(cublasCgemv(cublas_handle, CUBLAS_OP_T, signal_length_samples, d_n_correlators, &alpha,
-                             cu_local_codes_resampled, signal_length_samples, cu_phase, 1, &beta, cu_corr_out, 1));
-
-//    cuda_x2_dot_prod_xn_stage2<<<1, cu_num_blocks>>>(cu_corr_out, cu_red_tmp, d_n_correlators, signal_length_samples);
-//    gpuErrchk(cudaGetLastError());
-//    gpuErrchk(cudaMemcpy(d_corr_out, cu_corr_out, sizeof(cuComplex) * d_n_correlators, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(d_corr_out, cu_corr_out, sizeof(cuComplex) * d_n_correlators, cudaMemcpyDeviceToHost));
     return true;
 }
 
@@ -152,12 +149,10 @@ bool cuda_multicorrelator_real_codes::free()
 {
     gpuErrchk(cudaSetDevice(cu_selected_device));
     gpuErrchk(cudaFree(cu_red_tmp));
-    cublasErrchk(cublasDestroy(cublas_handle));
-    // Free memory
-    if (cu_local_codes_resampled != nullptr)
-    {
-        gpuErrchk(cudaFree(cu_local_codes_resampled));
-        cu_local_codes_resampled = nullptr;
-    }
+    gpuErrchk(cudaFreeHost(cu_sig_in));
+//    gpuErrchk(cudaMalloc((void**)&cu_sig_in, size));
+    gpuErrchk(cudaFree(cu_corr_out));
+    gpuErrchk(cudaFree(cu_local_code_in));
+    gpuErrchk(cudaFree(cu_shifts_chips));
     return true;
 }

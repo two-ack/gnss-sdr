@@ -284,6 +284,7 @@ int pcps_cuda_acquisition::init_cu()
     gpuErrchk(cudaSetDevice(selected_device));
 
     cufftErrchk(cufftPlan1d(&cu_fft_plan, d_fft_size, CUFFT_C2C, 1));
+    cufftErrchk(cufftSetStream(cu_fft_plan, cudaStreamPerThread));
 
     gpuErrchk(cudaMalloc((void **)&cu_data_buffer, sizeof(cuComplex) * d_fft_size_pow2));
     if (d_cshort)
