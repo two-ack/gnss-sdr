@@ -74,7 +74,7 @@ bool cuda_multicorrelator_real_codes::init(int device, int max_signal_length_sam
     size_t size = max_signal_length_samples_pow2 * sizeof(cuComplex);
     gpuErrchk(cudaHostAlloc((void**)&cu_sig_in, size, cudaHostAllocMapped | cudaHostAllocWriteCombined));
 //    gpuErrchk(cudaMalloc((void**)&cu_sig_in, size));
-    gpuErrchk(cudaMalloc((void**)&cu_corr_out, n_correlators * sizeof(cuComplex)));
+//    gpuErrchk(cudaMalloc((void**)&cu_corr_out, n_correlators * sizeof(cuComplex)));
     gpuErrchk(cudaMalloc((void**)&cu_local_code_in, code_length_chips * sizeof(float)));
     gpuErrchk(cudaMalloc((void**)&cu_shifts_chips, n_correlators * sizeof(float)));
     gpuErrchk(cudaMalloc((void**)&cu_red_tmp, n_correlators * cu_mul_num_blocks * sizeof(cuComplex)));
@@ -101,7 +101,7 @@ bool cuda_multicorrelator_real_codes::set_input_output_vectors(gr_complex* corr_
 {
     // Save CUDA pointers
     d_sig_in = sig_in;
-    d_corr_out = corr_out;
+    gpuErrchk(cudaHostGetDevicePointer((void **)&cu_corr_out, corr_out, 0));
     return true;
 }
 
@@ -140,7 +140,7 @@ bool cuda_multicorrelator_real_codes::Carrier_wipeoff_multicorrelator_resampler(
     gpuErrchk(cudaGetLastError());
     cuda_multicorrelator_stage2<<<d_n_correlators, cu_mul_num_blocks>>>(cu_corr_out, cu_red_tmp);
     gpuErrchk(cudaGetLastError());
-    gpuErrchk(cudaMemcpy(d_corr_out, cu_corr_out, sizeof(cuComplex) * d_n_correlators, cudaMemcpyDeviceToHost));
+//    gpuErrchk(cudaMemcpy(d_corr_out, cu_corr_out, sizeof(cuComplex) * d_n_correlators, cudaMemcpyDeviceToHost));
     return true;
 }
 
@@ -151,7 +151,7 @@ bool cuda_multicorrelator_real_codes::free()
     gpuErrchk(cudaFree(cu_red_tmp));
     gpuErrchk(cudaFreeHost(cu_sig_in));
 //    gpuErrchk(cudaMalloc((void**)&cu_sig_in, size));
-    gpuErrchk(cudaFree(cu_corr_out));
+//    gpuErrchk(cudaFree(cu_corr_out));
     gpuErrchk(cudaFree(cu_local_code_in));
     gpuErrchk(cudaFree(cu_shifts_chips));
     return true;
