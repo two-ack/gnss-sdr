@@ -113,6 +113,7 @@
 #include "tracking_interface.h"
 #include "two_bit_cpx_file_signal_source.h"
 #include "two_bit_packed_file_signal_source.h"
+#include "nut4nt_file_signal_source.h"
 #include <glog/logging.h>
 #include <exception>  // for exception
 #include <utility>    // for move
@@ -1331,6 +1332,20 @@ std::unique_ptr<GNSSBlockInterface> GNSSBlockFactory::GetBlock(
                     block = std::move(block_);
                 }
             catch (const std::exception& e)
+                {
+                    std::cout << "GNSS-SDR program ended." << std::endl;
+                    exit(1);
+                }
+        }
+    else if (implementation == "Nut4nt_File_Signal_Source")
+        {
+            try
+                {
+                    std::unique_ptr<GNSSBlockInterface> block_(new Nut4ntFileSignalSource(configuration.get(), role, in_streams,
+                        out_streams, queue));
+                    block = std::move(block_);
+                }
+            catch (const std::exception &e)
                 {
                     std::cout << "GNSS-SDR program ended." << std::endl;
                     exit(1);

@@ -135,6 +135,7 @@ set(SIGNAL_SOURCE_ADAPTER_SOURCES
     rtl_tcp_signal_source.cc
     labsat_signal_source.cc
     two_bit_cpx_file_signal_source.cc
+    nut4nt_file_signal_source.cc
     two_bit_packed_file_signal_source.cc
     ${OPT_DRIVER_SOURCES}
 )
@@ -149,6 +150,7 @@ set(SIGNAL_SOURCE_ADAPTER_HEADERS
     rtl_tcp_signal_source.h
     labsat_signal_source.h
     two_bit_cpx_file_signal_source.h
+    nut4nt_file_signal_source.h
     two_bit_packed_file_signal_source.h
     ${OPT_DRIVER_HEADERS}
 )
