@@ -97,6 +97,12 @@ if(ENABLE_OSMOSDR)
     endif()
 endif()
 
+if(ENABLE_NUT2NT)
+    if(NUT2NT_FOUND)
+        add_definitions(-DNUT2NT_DRIVER=1)
+    endif()
+endif()
+
 if(ENABLE_GN3S)
     target_compile_definitions(core_receiver PRIVATE -DGN3S_DRIVER=1)
 endif()

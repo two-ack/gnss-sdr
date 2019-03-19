@@ -48,6 +48,8 @@ option(ENABLE_AD9361 "Enable the use of AD9361 direct to FPGA hardware, requires
 
 option(ENABLE_RAW_UDP "Enable the use of high-optimized custom UDP packet sample source, requires libpcap" OFF)
 
+option(ENABLE_NUT2NT "Enable the use of nut2nt front-end" OFF)
+
 option(ENABLE_FLEXIBAND "Enable the use of the signal source adater for the Teleorbit Flexiband GNU Radio driver" OFF)
 
 option(ENABLE_GN3S "Enable the use of the GN3S dongle as signal source (experimental)" OFF)
@@ -2190,6 +2192,28 @@ if(ENABLE_OSMOSDR)
 else()
     message(STATUS "The (optional) driver for OsmoSDR and related front-ends is not enabled.")
     message(STATUS " Enable it with 'cmake -DENABLE_OSMOSDR=ON ..' to add support for OsmoSDR and other front-ends (HackRF, bladeRF, Realtek's RTL2832U-based USB dongles, etc.)")
+endif()
+
+
+##########################################
+# gr-nut2nt - OPTIONAL
+# https://github.com/amungo/gr-nut2nt
+##########################################
+if(ENABLE_NUT2NT)
+    find_package(NUT2NT)
+    if(NUT2NT_FOUND)
+        message(STATUS "The driver for nut2nt front-end will be compiled.")
+        message(STATUS "You can disable it with 'cmake -DENABLE_NUT2NT=OFF ../'")
+    else()
+        if(ENABLE_PACKAGING)
+            message(WARNING "gr-nut2nt has not been found. Source blocks depending on it will NOT be built.")
+        else()
+            message(FATAL_ERROR "gr-nut2nt required to build gnss-sdr with the optional NUT2NT driver")
+        endif()
+    endif()
+else()
+    message(STATUS "The (optional) driver for nut2nt front-end is not enabled.")
+    message(STATUS "Enable it with 'cmake -DENABLE_NUT2NT=ON ../' to add support for nut2nt front-end")
 endif()
 
 
