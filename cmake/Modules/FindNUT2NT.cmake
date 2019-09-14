@@ -20,12 +20,12 @@
 ########################################################################
 
 include(FindPkgConfig)
-pkg_check_modules(GRNUT2NT_PKG gnuradio-nut4nt)
+pkg_check_modules(GRNUT2NT_PKG gnuradio-nut2nt)
 
 find_path(NUT2NT_INCLUDE_DIR
         NAMES
-        nut4nt/source.h
-        nut4nt/api.h
+        nut2nt/source.h
+        nut2nt/api.h
         PATHS
         ${NUT2NT_PKG_INCLUDE_DIRS}
         /usr/include
@@ -36,7 +36,7 @@ find_path(NUT2NT_INCLUDE_DIR
         )
 
 find_library(NUT2NT_LIBRARIES
-        NAMES gnuradio-nut4nt
+        NAMES gnuradio-nut2nt
         PATHS
         ${NUT2NT_PKG_LIBRARY_DIRS}
         /usr/lib

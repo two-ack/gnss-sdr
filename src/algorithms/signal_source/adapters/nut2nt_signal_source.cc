@@ -46,7 +46,7 @@ Nut2ntSignalSource::Nut2ntSignalSource(ConfigurationInterface *configuration,
                                                                                  out_stream_(out_stream),
                                                                                  queue_(std::move(queue)) {
 
-    std::string default_dump_file = "nut4nt.dump";
+    std::string default_dump_file = "nut2nt.dump";
     // NUT2NT COMMON PARAMETERS
     fx3_firmware_ = configuration->property(role + ".fx3_firmware", std::string("fx3.img"));
     lattice_algo_ = configuration->property(role + ".lattice_algo", std::string("lattice.sea"));
@@ -98,10 +98,10 @@ Nut2ntSignalSource::Nut2ntSignalSource(ConfigurationInterface *configuration,
         }
     }
     // 1.2 Make the NUT2NT source object
-    nut2nt_source_ = gr::nut4nt::nut4nt_source::make(RF_channels_, fx3_firmware_, config_file_, lattice_algo_,
+    nut2nt_source_ = gr::nut2nt::nut2nt_source::make(RF_channels_, fx3_firmware_, config_file_, lattice_algo_,
                                                      lattice_data_, item_size_, 2 * 1024 * 1024, 7, channel_);
 
-    nut2nt_source_->init_nut4nt_source();
+    nut2nt_source_->init_nut2nt_source();
 
     if (in_stream_ > 0) {
         LOG(ERROR) << "A signal source does not have an input stream";
@@ -165,7 +165,7 @@ void Nut2ntSignalSource::disconnect(gr::top_block_sptr top_block) {
 
 gr::basic_block_sptr Nut2ntSignalSource::get_left_block() {
     LOG(WARNING) << "Trying to get signal source left block.";
-    return gr::nut4nt::nut4nt_source::sptr();
+    return gr::nut2nt::nut2nt_source::sptr();
 }
 
 

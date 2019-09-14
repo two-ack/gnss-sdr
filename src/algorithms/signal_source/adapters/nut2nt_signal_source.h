@@ -38,7 +38,7 @@
 #include <gnuradio/hier_block2.h>
 #include <gnuradio/blocks/null_sink.h>
 #include <gnuradio/msg_queue.h>
-#include <nut4nt/nut4nt_source.h>
+#include <nut2nt/nut2nt_source.h>
 #include <string>
 #include <vector>
 
@@ -79,7 +79,7 @@ private:
     std::string role_;
     unsigned int in_stream_;
     unsigned int out_stream_;
-    gr::nut4nt::nut4nt_source::sptr nut2nt_source_;
+    gr::nut2nt::nut2nt_source::sptr nut2nt_source_;
 
     // NUT2NT SETTINGS
     std::string fx3_firmware_;
