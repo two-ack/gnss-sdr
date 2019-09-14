@@ -37,7 +37,8 @@
 #include <gnuradio/blocks/copy.h>
 #include <gnuradio/hier_block2.h>
 #include <gnuradio/blocks/null_sink.h>
-#include <gnuradio/msg_queue.h>
+#include "concurrent_queue.h"
+#include <pmt/pmt.h>
 #include <nut2nt/nut2nt_source.h>
 #include <string>
 #include <vector>
@@ -50,7 +51,7 @@ class Nut2ntSignalSource : public GNSSBlockInterface
 public:
     Nut2ntSignalSource(ConfigurationInterface* configuration,
                     const std::string& role, unsigned int in_stream,
-                    unsigned int out_stream, boost::shared_ptr<gr::msg_queue> queue);
+                    unsigned int out_stream, std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue);
 
     virtual ~Nut2ntSignalSource();
 
@@ -99,7 +100,7 @@ private:
     std::vector<boost::shared_ptr<gr::block>> valve_;
     std::vector<gr::blocks::file_sink::sptr> file_sink_;
 
-    boost::shared_ptr<gr::msg_queue> queue_;
+    std::shared_ptr<Concurrent_Queue<pmt::pmt_t>> queue_;
 };
 
 #endif /*GNSS_SDR_NUT2NT_SIGNAL_SOURCE_H_*/

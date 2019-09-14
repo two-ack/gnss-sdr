@@ -74,4 +74,15 @@ find_library(NUT2NT_LIBRARIES
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(NUT2NT DEFAULT_MSG NUT2NT_LIBRARIES NUT2NT_INCLUDE_DIR)
+
+if(NUT2NT_FOUND AND NOT TARGET Gnuradio::nut2nt)
+    add_library(Gnuradio::nut2nt SHARED IMPORTED)
+    set_target_properties(Gnuradio::nut2nt PROPERTIES
+        IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
+        IMPORTED_LOCATION "${NUT2NT_LIBRARIES}"
+        INTERFACE_INCLUDE_DIRECTORIES "${NUT2NT_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES "${NUT2NT_LIBRARIES}"
+    )
+endif()
+
 mark_as_advanced(NUT2NT_LIBRARIES NUT2NT_INCLUDE_DIR)

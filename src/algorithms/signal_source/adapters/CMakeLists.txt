@@ -253,6 +253,13 @@ if(ENABLE_ARRAY AND GRDBFCTTC_FOUND)
     )
 endif()
 
+if(ENABLE_NUT2NT AND NUT2NT_FOUND)
+    target_link_libraries(signal_source_adapters
+        PRIVATE
+            Gnuradio::nut2nt
+    )
+endif()
+
 target_compile_definitions(signal_source_adapters
     PRIVATE -DGNSSSDR_INSTALL_DIR="${CMAKE_INSTALL_PREFIX}"
 )
